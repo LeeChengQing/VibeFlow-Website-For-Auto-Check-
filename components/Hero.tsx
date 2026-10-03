@@ -6,7 +6,7 @@ import styles from './hero-isolation.module.css';
 // Server Component: the interactive card is composed by app/page.tsx.
 export function Hero({ children }: { children: ReactNode }) {
   return (
-    <section className={`hero shell ${styles.hero}`} aria-labelledby="hero-title">
+    <section id="hero" className={`hero shell ${styles.hero}`} aria-labelledby="hero-title">
       <HeroAmbientLogo />
       <div className="hero-grid">
         <div className={styles.copyColumn}>
