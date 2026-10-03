@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Soton Auto-Check · Motion example</title>
+  <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.26/dist/lenis.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.3.26/dist/lenis.min.js"></script>
+  <style>
+    html {scroll-padding-top:100px;scroll-behavior:auto;color-scheme:dark}
+    html.lenis {scroll-behavior:auto!important}
+    body {margin:0;background:#080809;color:#f5f4f1;font-family:Arial,sans-serif}
+    .line-mask {overflow:hidden;padding-bottom:.1em;margin-bottom:-.1em}
+    .headline-line {display:block}
+    .accent {background:linear-gradient(110deg,#e3e3e5,#8a8a90);background-clip:text;color:transparent}
+    a:focus-visible {outline:2px solid #bebef1;outline-offset:6px}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+  </style>
+</head>
+<body>
+  <header class="sticky top-0 z-20 border-b border-white/10 bg-[#080809]/95">
+    <nav class="max-w-7xl mx-auto px-6 md:px-10 py-5 flex items-center justify-between gap-6" aria-label="Main navigation">
+      <a href="/" class="flex items-center gap-3 font-bold text-lg" aria-label="Vibeflow home">
+        <img src="files/logo.png" alt="" width="34" height="34" class="rounded-xl">
+        <span>Vibeflow<span class="text-neutral-500">_MY</span></span>
+      </a>
+      <a href="#features" class="text-xs border border-white/25 rounded-full px-5 py-3">Explore the features ↗</a>
+    </nav>
+  </header>
+  <main>
+    <section class="max-w-7xl mx-auto px-6 md:px-10 pt-20 md:pt-32 pb-16" aria-labelledby="hero-title">
+      <div class="grid lg:grid-cols-[1.2fr_1fr] gap-16 items-center">
+        <div>
+          <p class="text-[10px] tracking-[.18em] text-neutral-400 font-bold">LESS ADMIN. MORE STUDENT LIFE.</p>
+          <h1 id="hero-title" class="text-[clamp(40px,5.5vw,76px)] font-extrabold tracking-[-.065em] leading-[1.2] my-7" aria-label="Set it up. Stay on track.">
+            <div class="line-mask" aria-hidden="true"><span class="headline-line">Set it up.</span></div>
+            <div class="line-mask" aria-hidden="true"><span class="headline-line accent">Stay on track.</span></div>
+          </h1>
+          <p class="max-w-md text-sm text-neutral-400 leading-8">Bring your timetable and check-ins together. Soton Auto-Check takes the repetition out of your class routine at Southampton / UoSM.</p>
+          <a href="#features" class="inline-flex mt-8 bg-[#f3f2ef] text-black font-semibold text-sm px-6 py-4 rounded-full">See how it works <span class="ml-8" aria-hidden="true">↓</span></a>
+          <p class="mt-5 text-[10px] text-neutral-500">Windows & macOS · Local data · No account required</p>
+        </div>
+        <aside class="bg-[#161618] rounded-[26px] border border-white/20 p-7 md:p-9 shadow-2xl lg:rotate-1">
+          <p class="text-[9px] tracking-[.15em] text-neutral-500 mb-8">YOUR NEXT SEMESTER, SORTED.</p>
+          <div class="flex gap-4 items-center"><img src="files/logo.png" alt="" width="64" height="64" class="rounded-2xl"><div><p class="text-[9px] text-neutral-400 tracking-widest">SOTON AUTO-CHECK</p><h2 class="text-xl font-bold mt-2">A simpler class routine.</h2></div></div>
+          <p class="text-xs text-neutral-500 my-6">Two separate packages. Pick what you need.</p>
+          <div class="rounded-xl border border-white/40 p-5 flex justify-between gap-4 text-sm"><span>Check-in extension<small class="block text-neutral-500 mt-2">One-time purchase</small></span><strong class="whitespace-nowrap">RM 24.99</strong></div>
+          <div class="rounded-xl border border-white/10 p-5 flex justify-between gap-4 text-sm mt-3"><span>Mobile notifications<small class="block text-neutral-500 mt-2">Per semester · Extension add-on</small></span><strong class="whitespace-nowrap">RM 11.99</strong></div>
+          <a href="/#pricing" class="block text-center mt-5 bg-[#f3f2ef] text-black rounded-xl py-4 font-semibold text-sm">View packages ↗</a>
+          <p class="text-[10px] text-neutral-500 text-center mt-4">Motion example · No payment is collected</p>
+        </aside>
+      </div>
+      <div class="mt-20 border-t border-white/15 pt-6 flex justify-between text-[8px] tracking-[.15em] text-neutral-500 gap-5"><span>SOUTHAMPTON / UOSM STUDENTS</span><span>SCROLL TO EXPLORE ↓</span></div>
+    </section>
+
+    <section id="features" class="max-w-7xl mx-auto px-6 md:px-10 mt-20" aria-labelledby="features-title">
+      <p class="text-[10px] tracking-[.18em] text-neutral-500 font-bold">HOW IT WORKS / 01</p>
+      <h2 id="features-title" class="text-3xl md:text-5xl font-bold tracking-[-.05em] mt-4 mb-10">Simple from the start.</h2>
+      <div class="grid md:grid-cols-3 gap-7">
+        <article class="feature-card bg-[#141416] border border-white/15 rounded-2xl p-8"><span class="text-xs text-neutral-500">01</span><h3 class="text-xl font-bold mt-10 mb-4">One timetable. One setup.</h3><p class="text-sm text-neutral-400 leading-7">Import your timetable, review the detected classes, days, and times, then make any edits.</p></article>
+        <article class="feature-card bg-[#141416] border border-white/15 rounded-2xl p-8"><span class="text-xs text-neutral-500">02</span><h3 class="text-xl font-bold mt-10 mb-4">Connect your check-in.</h3><p class="text-sm text-neutral-400 leading-7">Upload a course QR code or paste a Microsoft Forms link. Match Lectures, Tutorials, and Labs.</p></article>
+        <article class="feature-card bg-[#141416] border border-white/15 rounded-2xl p-8"><span class="text-xs text-neutral-500">03</span><h3 class="text-xl font-bold mt-10 mb-4">Your week, laid out.</h3><p class="text-sm text-neutral-400 leading-7">Save your student details, generate weekly tasks, and confirm them before scheduled execution.</p></article>
+      </div>
+    </section>
+
+    <div class="px-6 md:px-10">
+      <section id="showcase" class="max-w-7xl mx-auto bg-white rounded-[40px] overflow-hidden my-32 p-8 md:p-16 text-slate-900" style="color-scheme:light" aria-labelledby="showcase-title">
+        <p class="text-[10px] font-bold tracking-[.18em] text-slate-500 text-center">A LIGHTER CLASS ROUTINE</p>
+        <h2 id="showcase-title" class="text-4xl md:text-5xl font-black tracking-[-.05em] text-center mt-5 mb-12">Your timetable, connected.</h2>
+        <div class="grid md:grid-cols-2 gap-10 items-center">
+          <div class="bg-[#111114] rounded-[28px] aspect-square flex items-center justify-center shadow-[0_24px_60px_#0004]"><img src="files/logo.png" alt="Soton Auto-Check logo" width="270" height="270" class="w-2/3 rounded-[32px]"></div>
+          <div><p class="text-xs font-bold tracking-widest text-slate-500">SOTON AUTO-CHECK</p><h3 class="text-3xl font-black tracking-tight mt-5 mb-5">Less repetition.<br>More peace of mind.</h3><p class="text-sm text-slate-600 leading-8">From importing your timetable to checking your results, keep your class routine clear. Designed for Southampton / UoSM students.</p><a href="/#pricing" class="inline-flex mt-7 bg-[#111114] text-white rounded-full px-6 py-4 text-sm font-semibold">Find your package ↗</a></div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer class="max-w-7xl mx-auto px-6 md:px-10 pb-12 text-xs text-neutral-500">Vibeflow_MY · Soton Auto-Check · Standalone motion example</footer>
+
+  <script>
+    // This file runs independently of Next.js. The live React site uses npm imports.
+    gsap.registerPlugin(ScrollTrigger);
+    gsap.ticker.lagSmoothing(0);
+    gsap.ticker.fps(120);
+    const tl = gsap.timeline({paused:true});
+    const seek = new URLSearchParams(location.search).get('t');
+    const frozen = seek !== null && Number.isFinite(Number(seek));
+    const media = gsap.matchMedia();
+    window.__ready = false;
+
+    document.fonts.ready.then(() => {
+      media.add('(prefers-reduced-motion: no-preference)', () => {
+        let lenis;
+        let tick;
+        let stopTick;
+        let interrupt;
+        let keyInput;
+        if (!frozen) {
+          let ticking=false;
+          stopTick=()=>{gsap.ticker.remove(tick);ticking=false;};
+          const startTick=()=>{if(!ticking){gsap.ticker.wake();lenis.time=gsap.ticker.time*1000;gsap.ticker.add(tick);ticking=true;}};
+          interrupt=event=>{if(event?.ctrlKey)return;if(ticking){stopTick();lenis.stop();lenis.start();}};
+          keyInput=event=>{if(!event.target.closest?.('input,textarea,select,[contenteditable="true"]')&&['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key))interrupt(event);};
+          lenis = new Lenis({eventsTarget:document.createElement('div'),lerp:.2,smoothWheel:false,syncTouch:false,autoRaf:false,
+            anchors:{duration:.4,easing:t=>1-Math.pow(1-t,3),onStart:startTick,onComplete:stopTick}});
+          lenis.on('scroll', ScrollTrigger.update);
+          tick = seconds => lenis.raf(seconds*1000);
+          window.addEventListener('wheel',interrupt,{passive:true});
+          window.addEventListener('touchstart',interrupt,{passive:true});
+          window.addEventListener('keydown',keyInput);
+        }
+
+        tl.fromTo('.headline-line', {yPercent:100,opacity:0}, {
+          yPercent:0,opacity:1,duration:1.5,ease:'power4.out',stagger:0.15
+        });
+        const cards = {y:0,opacity:1,duration:0.8,ease:'power3.out',stagger:0.2};
+        const showcase = {y:60,opacity:1,duration:0.8,ease:'power3.out'};
+
+        if (frozen) {
+          // Inspection mode collects all motion on one seekable master timeline.
+          tl.fromTo('.feature-card', {y:50,opacity:0}, cards, 1.8)
+            .fromTo('#showcase', {y:60,opacity:0}, {...showcase,y:0}, 3.1);
+          tl.pause().seek(Math.max(0, Number(seek)));
+        } else {
+          // ScrollTrigger owns these separate tweens; do not nest them in tl.
+          gsap.fromTo('.feature-card', {y:50,opacity:0}, {...cards,
+            scrollTrigger:{trigger:'#features .grid',start:'top 85%',once:true}
+          });
+          gsap.fromTo('#showcase', {y:60,opacity:0}, {...showcase,y:0,
+            scrollTrigger:{trigger:'#showcase',start:'top 88%',once:true}
+          });
+          tl.play();
+          ScrollTrigger.refresh();
+        }
+        return () => {
+          tl.clear();
+          if (lenis) {stopTick();window.removeEventListener('wheel',interrupt);window.removeEventListener('touchstart',interrupt);window.removeEventListener('keydown',keyInput);lenis.off('scroll',ScrollTrigger.update);lenis.stop();lenis.destroy();}
+        };
+      });
+      // With reduced motion, no Lenis instance or hidden content is created.
+      window.__timelineDuration = tl.duration();
+      window.__ready = true;
+    });
+    window.addEventListener('pagehide', event => {if (!event.persisted) media.revert();});
+  </script>
+</body>
+</html>
