@@ -166,6 +166,8 @@ export function HeroPurchaseCard() {
         </div>
       </div>
 
+    </div>
+    <div className="hero-checkout-footer">
       <BuyButton plan={checkoutPlan}>{cta}</BuyButton>
     </div>
   </div>;
