@@ -1,6 +1,6 @@
 'use client';
 
-import {useLayoutEffect, type RefObject} from 'react';
+import {useEffect, type RefObject} from 'react';
 import {gsap} from 'gsap';
 import {ScrollTrigger} from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
@@ -10,7 +10,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 /** Own the landing page's scroll loop and animations, including SPA cleanup. */
 export function useLandingMotion(rootRef:RefObject<HTMLDivElement|null>,locale:string) {
-  useLayoutEffect(()=>{
+  useEffect(()=>{
     const root=rootRef.current;
     if(!root)return;
     // ScrollTrigger's global media refresh temporarily scrolls to zero. Killing

@@ -5,6 +5,7 @@ import {DeferredProgram} from '../lib/DeferredProgram';
 import { subscribeScrollActivity,isScrollActive } from '../lib/scrollActivity';
 import { subscribeAnimationFrame } from '../lib/animationScheduler';
 import {isLowEffects,subscribeEffectsPolicy} from '../lib/performancePolicy';
+import {isAmbientBusy,subscribeAmbientActivity} from '../lib/ambientActivity';
 
 // Constants for the ElectricLogo component
 const CELL = 4;
@@ -456,14 +457,18 @@ const ElectricLogo = ({
     const freeSpark=()=>{for(let i=0;i<ARCS;i++)if(!sparks[i].active)return sparks[i];return null;};
 
     const resize = () => {
-      width = Math.max(1, container.clientWidth); height = Math.max(1, container.clientHeight);
+      const nextWidth = Math.max(1, container.clientWidth), nextHeight = Math.max(1, container.clientHeight);
       const rect=container.getBoundingClientRect();left=rect.left+scrollX;top=rect.top+scrollY;
-      renderer.dpr = Math.min(window.devicePixelRatio || 1, 1, Math.sqrt(PIXEL_BUDGET / (width * height)));
+      const nextDpr = Math.min(window.devicePixelRatio || 1, 1, Math.sqrt(PIXEL_BUDGET / (nextWidth * nextHeight)));
+      // Writing either canvas dimension clears its drawing buffer, even when
+      // unchanged. Ignore duplicate ResizeObserver deliveries.
+      if (width === nextWidth && height === nextHeight && renderer.dpr === nextDpr) return;
+      width = nextWidth; height = nextHeight; renderer.dpr = nextDpr;
       renderer.setSize(width, height); uniforms.uResolution.value[0]=width;uniforms.uResolution.value[1]=height;placementDirty=true;
     };
 
     const frame = now => {
-      if(disposed || !visible || scrolling || isScrollActive() || document.hidden || isLowEffects()) return;
+      if(disposed || !visible || scrolling || isScrollActive() || document.hidden || isLowEffects() || isAmbientBusy()) return;
       // Initialization polling uses the shared ticker; no extra rAF loop and
       // no shader status/log query while compilation is still in progress.
       if(!mesh){
@@ -562,8 +567,9 @@ const ElectricLogo = ({
     };
 
     const stop = () => {releaseFrame?.();releaseFrame=null;};
-    const start = () => { if (disposed || releaseFrame || !visible || scrolling || document.hidden || isLowEffects()) return; last = 0; releaseFrame = subscribeAnimationFrame(frame); };
+    const start = () => { if (disposed || releaseFrame || !visible || scrolling || document.hidden || isLowEffects() || isAmbientBusy()) return; last = 0; releaseFrame = subscribeAnimationFrame(frame); };
     const unsubscribeScroll = subscribeScrollActivity(active=>{scrolling=active;if(active)stop();else start();});
+    const unsubscribeAmbient = subscribeAmbientActivity(active=>{if(active)stop();else start();});
     const syncVisibility = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener('visibilitychange', syncVisibility);
     const onContextLost = () => {visible=false;stop();delete container.dataset.rendered;};
@@ -587,7 +593,7 @@ const ElectricLogo = ({
     resize(); start();
 
     return () => {
-      disposed = true; visible = false; stop(); unsubscribeScroll(); resizeObserver.disconnect(); intersectionObserver.disconnect();
+      disposed = true; visible = false; stop(); unsubscribeScroll(); unsubscribeAmbient(); resizeObserver.disconnect(); intersectionObserver.disconnect();
       document.removeEventListener('visibilitychange', syncVisibility);
       canvas.removeEventListener('webglcontextlost', onContextLost);
       delete container.dataset.rendered;

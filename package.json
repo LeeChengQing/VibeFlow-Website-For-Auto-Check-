@@ -10,6 +10,7 @@
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
     "test:perf": "npm run build && playwright test --config playwright.perf.config.ts",
+    "test:performance-audit": "npm run build && playwright test --config playwright.audit.config.ts",
     "test:ui:prod": "npm run build && playwright test --config playwright.production.config.ts"
   },
   "engines": {

@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BUNDLE_OFFER_ENDS_AT, getPlanAmount, notificationPlanCodes, plans, price, type NotificationBillingPlan, type PlanCode } from '@/lib/plans';
 import { formatPurchaseText, purchaseText } from '@/lib/purchaseLocale';
 import { useLocale } from './LocaleProvider';
@@ -56,10 +56,21 @@ export function HeroPurchaseCard() {
   const [bundleAmount, setBundleAmount] = useState(() => getPlanAmount('bundle'));
   const [offerActive, setOfferActive] = useState(() => Date.now() < BUNDLE_OFFER_ENDS_AT);
   const productRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const checkoutCardRef = useRef<HTMLDivElement>(null);
   const notificationPlan = notificationPlanCodes[billingPlan];
   const lowestNotificationPrice = (Object.keys(notificationPlanCodes) as NotificationBillingPlan[])
     .map(period => ({ period, amount: getPlanAmount(notificationPlanCodes[period]) }))
     .reduce((lowest, current) => current.amount < lowest.amount ? current : lowest);
+
+  // Reuse the static JSX subtree on product/billing updates; translate on locale changes.
+  const heading = useMemo(() => <>
+    <div className="window-label"><span>YOUR NEXT SEMESTER, SORTED.</span><span className="window-dots" aria-hidden>● ● ●</span></div>
+    <div className="checkout-product">
+      <Image src="/files/logo.png" alt="Auto-Check" width="64" height="64" sizes="64px" quality={100} loading="eager"/>
+      <div><p className="eyebrow">AUTO-CHECK</p><h2>{t('让签到简单一点。', 'A simpler class routine.')}</h2></div>
+    </div>
+    <p className="checkout-subtitle">{t('选择你需要的服务。', 'Choose the service you need.')}</p>
+  </>, [t]);
 
   useEffect(() => {
     const timeUntilOfferEnds = BUNDLE_OFFER_ENDS_AT - Date.now();
@@ -74,6 +85,31 @@ export function HeroPurchaseCard() {
     }, timeUntilOfferEnds + 100);
     return () => window.clearTimeout(timeout);
   }, []);
+
+  useEffect(() => {
+    if (selectedProduct !== 'notification') return;
+    const timeout = window.setTimeout(() => {
+      const card = checkoutCardRef.current;
+      if (!card) return;
+
+      const cardRect = card.getBoundingClientRect();
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const orbRect = document.querySelector<HTMLElement>('.support-orb')?.getBoundingClientRect();
+      const visibleBottom = orbRect && cardRect.right > orbRect.left && cardRect.left < orbRect.right
+        ? orbRect.top - 16
+        : viewportHeight - 20;
+      const scrollDistance = cardRect.bottom - visibleBottom;
+
+      if (scrollDistance > 0) {
+        window.scrollBy({
+          top: scrollDistance,
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [selectedProduct]);
 
   const checkoutPlan: PlanCode = selectedProduct === 'bundle'
     ? 'bundle'
@@ -95,14 +131,9 @@ export function HeroPurchaseCard() {
     productRefs.current[nextIndex]?.focus();
   }
 
-  return <div className="hero-checkout">
+  return <div ref={checkoutCardRef} className="hero-checkout">
     <div className="checkout-card-content">
-      <div className="window-label"><span>YOUR NEXT SEMESTER, SORTED.</span><span className="window-dots" aria-hidden>● ● ●</span></div>
-      <div className="checkout-product">
-        <Image src="/files/logo.png" alt="Auto-Check" width="64" height="64" sizes="64px" quality={100} loading="eager"/>
-        <div><p className="eyebrow">AUTO-CHECK</p><h2>{t('让签到简单一点。', 'A simpler class routine.')}</h2></div>
-      </div>
-      <p className="checkout-subtitle">{t('选择你需要的服务。', 'Choose the service you need.')}</p>
+      {heading}
 
       <div className="mini-plans" role="radiogroup" aria-label={t('选择产品', 'Choose a product')}>
         <div className="mini-bundle-group">

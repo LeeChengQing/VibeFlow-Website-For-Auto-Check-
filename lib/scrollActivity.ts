@@ -5,8 +5,10 @@ let scrolling=false,requested=false,deadline=0,releaseTick:(()=>void)|undefined;
 export function isScrollActive(){return requested||scrolling;}
 const update=()=>{
   const active=requested&&performance.now()<deadline;
+  // Publish a coherent idle state: subscribers may read isScrollActive().
+  if(!active)requested=false;
   if(active!==scrolling){scrolling=active;subscribers.forEach(callback=>callback(active));}
-  if(!active){requested=false;releaseTick?.();releaseTick=undefined;}
+  if(!active){releaseTick?.();releaseTick=undefined;}
 };
 // Passive handlers only record activity. All subscribers run from the ticker.
 const markActive=(event:Event)=>{

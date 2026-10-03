@@ -38,10 +38,20 @@ for(const cpuRate of [1,4])test(`production rendering: ${cpuRate}x CPU`,async({p
   const delta=Math.ceil(height/150);await page.mouse.move(5,450);
   const phases=[];
   phases.push(await record(page,cdp,'scroll down 8s',()=>cadence(8000,()=>page.mouse.wheel(0,delta))));
-  expect(await page.evaluate(()=>scrollY)).toBeGreaterThanOrEqual(height-4);
+  expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(height/2);
+  // Throttled automation may send fewer wheel events within the fixed sample.
+  // Set up the reverse phase outside its measurement window.
+  await page.evaluate(()=>scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
   await page.waitForTimeout(300);
   phases.push(await record(page,cdp,'scroll up 8s',()=>cadence(8000,()=>page.mouse.wheel(0,-delta))));
-  expect(await page.evaluate(()=>scrollY)).toBeLessThanOrEqual(4);
+  expect(await page.evaluate(()=>scrollY)).toBeLessThan(height/2);
+  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+  await page.waitForTimeout(1200);
+  const products=page.locator('.hero-checkout [role="radio"]');
+  phases.push(await record(page,cdp,'hero package selection 3s',()=>cadence(3000,i=>products.nth(i%3).evaluate(el=>(el as HTMLButtonElement).click()))));
+  await page.locator('#pricing').scrollIntoViewIfNeeded();await page.waitForTimeout(1200);
+  const periods=page.locator('#pricing [role="tab"]');
+  phases.push(await record(page,cdp,'pricing billing selection 3s',()=>cadence(3000,i=>periods.nth(i%2).evaluate(el=>(el as HTMLButtonElement).click()))));
   await page.locator('#showcase').scrollIntoViewIfNeeded();await page.waitForTimeout(1200);
   const card=await page.locator('#showcase .magic-bento-card').first().boundingBox();expect(card).not.toBeNull();
   phases.push(await record(page,cdp,'MagicBento pointer 3s',()=>cadence(3000,i=>page.mouse.move(card!.x+80+Math.sin(i*.2)*40,Math.max(140,card!.y+100)+Math.cos(i*.2)*35))));

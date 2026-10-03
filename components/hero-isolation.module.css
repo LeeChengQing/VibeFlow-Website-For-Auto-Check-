@@ -1,0 +1,33 @@
+.hero {
+  --hero-scene-height: calc(100svh - var(--header-height));
+}
+
+/* The text centers within its own column, independently of card expansion. */
+.copyColumn {
+  display: flex;
+  align-items: center;
+  align-self: start;
+  min-width: 0;
+  min-height: max(0px, calc(var(--hero-scene-height) - 84px));
+}
+
+/* Percentage insets against an expanding hero resize and clear WebGL's buffer.
+   Use viewport geometry so selecting a package never changes the canvas size. */
+.ambient:global(.hero-ambient) {
+  inset: calc(var(--hero-scene-height) * -0.18) 14% auto -8%;
+  height: calc(var(--hero-scene-height) * 1.16);
+  contain: layout paint;
+  transform: translateZ(0);
+}
+
+@media (max-width: 767px) {
+  .copyColumn {
+    display: block;
+    min-height: 0;
+  }
+
+  .ambient:global(.hero-ambient) {
+    inset: calc(var(--hero-scene-height) * -0.08) -10% auto -36%;
+    height: calc(var(--hero-scene-height) * 0.68);
+  }
+}

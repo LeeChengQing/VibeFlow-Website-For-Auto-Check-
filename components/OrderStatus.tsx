@@ -33,7 +33,7 @@ export function OrderStatus({ token }: { token: string }) {
     catch { setError(t('无法复制密钥，请手动选择并复制。', 'Could not copy the key. Please select and copy it manually.')); }
   }
 
-  if (!order) return <section className="portal narrow"><p className={error ? 'form-error' : 'loading-state'} role={error ? 'alert' : undefined}>{error || t('加载中…', 'Loading…')}</p><Link className="button" href="/">{t('回到首页', 'Back home')}</Link></section>;
+  if (!order) return <section className="portal narrow"><p className={error ? 'form-error' : 'loading-state'} role={error ? 'alert' : undefined}>{error || t('加载中…', 'Loading…')}</p><Link prefetch={true} className="button" href="/">{t('回到首页', 'Back home')}</Link></section>;
 
   const isPaid = order.status === 'paid';
   const status = { pending: t('等待付款', 'Awaiting payment'), paid: t('模拟付款成功', 'Simulated payment complete'), cancelled: t('付款已取消', 'Payment cancelled'), refunded: t('订单已退款', 'Order refunded') }[order.status];
@@ -47,16 +47,16 @@ export function OrderStatus({ token }: { token: string }) {
   const canCopyDelivery = Boolean(order.delivery && order.plan !== 'extension' && !expired);
   const supportHref = order.email ? `/support?reference=${encodeURIComponent(order.reference)}&email=${encodeURIComponent(order.email)}` : '/support';
 
-  return <section className={`portal order-page ${isPaid ? 'is-paid' : ''}`}>
+  return <section className={`portal order-page pb-32 ${isPaid ? 'is-paid' : ''}`}>
     <div className="order-layout">
       <section className="order-copy" aria-labelledby="order-page-title">
-        <Link className="back-link" href="/">← {t('回到网站', 'Back to website')}</Link>
+        <Link prefetch={true} className="back-link" href="/">← {t('回到网站', 'Back to website')}</Link>
         <p className="eyebrow">YOUR ORDER / LOCAL PREVIEW</p>
         <h1 id="order-page-title" className="portal-title">{status}</h1>
         <p className="portal-intro">{t('保存此专属链接，以便查看订单状态和联系客服。', 'Keep this private link to check your order and contact support.')}</p>
       </section>
 
-      <div className="order-receipt-column">
+      <div className="order-receipt-column w-full max-w-md xl:max-w-lg">
         {isPaid ? <ReceiptTicket order={order} includedItems={receiptItems} error={error} onOpenSupport={supportHref} onRefresh={refresh} refreshing={busy} /> : <section className="panel order-plain-card" aria-label={t('订单详情', 'Order details')}>
           <span className={`status-badge ${order.status}`}>{status}</span>
           <div className="status-display">
@@ -69,8 +69,8 @@ export function OrderStatus({ token }: { token: string }) {
           {order.status === 'refunded' && <p className="notice">{t('交付预览已停用。', 'The delivery preview has been disabled.')}</p>}
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="portal-actions">
-            {order.status === 'pending' ? <Link className="button primary" href={`/checkout/${token}`}>{t('继续测试付款', 'Continue test checkout')} ↗</Link> : <Link className="button primary" href="/#pricing">{t('查看方案', 'Browse packages')} ↗</Link>}
-            <Link className="button" href={supportHref}>{t('订单客服', 'Order support')}</Link>
+            {order.status === 'pending' ? <Link prefetch={true} className="button primary" href={`/checkout/${token}`}>{t('继续测试付款', 'Continue test checkout')} ↗</Link> : <Link prefetch={true} className="button primary" href="/#pricing">{t('查看方案', 'Browse packages')} ↗</Link>}
+            <Link prefetch={true} className="button" href={supportHref}>{t('订单客服', 'Order support')}</Link>
             <button className="button" onClick={refresh} disabled={busy}>{t('刷新状态', 'Refresh status')}</button>
           </div>
         </section>}
@@ -91,7 +91,7 @@ export function OrderStatus({ token }: { token: string }) {
           {canCopyDelivery && <button className="button small delivery-copy" onClick={copyDelivery} aria-label={t('复制 DEMO 通知密钥', 'Copy DEMO notification key')}>{copied ? t('已复制', 'Copied') : t('复制密钥', 'Copy key')}</button>}
         </>}
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="portal-actions order-paid-actions"><Link className="button primary" href="/#pricing">{t('查看方案', 'Browse packages')} ↗</Link></div>
+        <div className="portal-actions order-paid-actions"><Link prefetch={true} className="button primary" href="/#pricing">{t('查看方案', 'Browse packages')} ↗</Link></div>
       </section>}
 
       <div className="order-notice-column"><div className="local-banner">{t('此订单仅用于本地测试。没有真实付款或邮件交付。', 'This order is for local testing only. No real payment or email delivery took place.')}</div>{isPaid && error && <p className="form-error" role="alert">{error}</p>}</div>

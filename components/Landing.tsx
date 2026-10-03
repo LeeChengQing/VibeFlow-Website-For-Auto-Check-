@@ -1,24 +1,18 @@
 'use client';
 import Image from 'next/image';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { getPlanAmount, plans, price, notificationPlanCodes, type NotificationBillingPlan } from '@/lib/plans';
-import { purchaseText } from '@/lib/purchaseLocale';
+import { getPlanAmount, plans, price } from '@/lib/plans';
 import { useLocale } from './LocaleProvider';
 import { Showcase } from './Showcase';
 import { BuyButton } from './BuyButton';
 import { BundleOfferCard } from './BundleOfferCard';
-import { HeroPurchaseCard } from './HeroPurchaseCard';
-import { BillingSegmentedControl } from './BillingSegmentedControl';
-import { NotificationPriceDisplay } from './NotificationPriceDisplay';
+import { NotificationPricingCard } from './NotificationPricingCard';
 import { GuideViewer } from './GuideViewer';
 import { useLandingMotion } from './useLandingMotion';
-import { HeroAmbientLogo } from './HeroAmbientLogo';
 import { MagicBento } from './MagicBento';
-export function Landing(){
-  const {t,locale}=useLocale();const [selectedNotificationPlan,setSelectedNotificationPlan]=useState<NotificationBillingPlan>('yearly'); const [guide,setGuide]=useState<{src:string;title:string}|null>(null);
-  const selectedNotificationCode=notificationPlanCodes[selectedNotificationPlan];
-  const notificationCta=purchaseText(locale, selectedNotificationPlan === 'yearly' ? 'yearlyCta' : 'semesterCta');
+export function Landing({children}:{children:ReactNode}){
+  const {t,locale}=useLocale();const [guide,setGuide]=useState<{src:string;title:string}|null>(null);
   const rootRef=useRef<HTMLDivElement>(null);useLandingMotion(rootRef,locale);
   const features=[
     [t('你的课表，一次导入','One timetable. One setup.'),t('支持 PDF、JPG、JPEG、PNG，识别课程、星期和时间，并允许手动修改。','Import PDF, JPG, JPEG, or PNG. Review detected classes, days, and times, then make any edits.')],
@@ -42,12 +36,7 @@ export function Landing(){
     [t('遇到问题如何联系客服？','How do I get help?'),t('点击右下角的动态球或联系客服。提供邮箱及订单号，我们可以查看问题并在工单内回复。请保存你的专属工单链接。','Use the animated orb or the support link. Include your email and order reference, and keep your private ticket link to view replies.')],
   ];
   return <div className="landing" ref={rootRef}>
-    <section className="hero shell" aria-labelledby="hero-title">
-      <HeroAmbientLogo/>
-      <div className="hero-grid"><div className="hero-copy"><p className="eyebrow"><span className="status-dot"/>{t('为学生的日常，少一点琐碎','LESS ADMIN. MORE STUDENT LIFE.')}</p><h1 id="hero-title" aria-label={t('一次配置， 告别签到遗漏。','Set it up. Stay on track.')}><div className="hero-line-mask" aria-hidden="true"><span className="hero-line">{t('一次配置，','Set it up.')}</span></div><div className="hero-line-mask" aria-hidden="true"><span className="hero-line hero-line-accent">{t('告别签到遗漏。','Stay on track.')}</span></div></h1><p className="hero-description">{t('让课表与签到自然衔接。为 Southampton / UoSM 学生设计的课程签到辅助，把重复操作交给 Auto-Check。','Bring your timetable and check-ins together. Auto-Check takes the repetition out of your class routine at Southampton / UoSM.')}</p><div className="hero-buttons"><a className="button primary" href="#pricing">{t('选择你的方案','Find your package')} <span aria-hidden>↗</span></a><a className="button secondary" href="#workflow">{t('了解使用流程','See how it works')} <span aria-hidden>↓</span></a></div><p className="hero-note">{t('Windows & macOS · 本地保存资料 · 无需注册账号','Windows & macOS · Local data · No account required')}</p></div>
-      <HeroPurchaseCard/></div>
-      <div className="hero-base"><span>SOUTHAMPTON / UOSM STUDENTS</span><span>{t('为你的课程安排而设计','DESIGNED AROUND YOUR TIMETABLE')}</span><a href="#showcase" aria-label={t('向下探索','Explore below')}>SCROLL TO EXPLORE ↓</a></div>
-    </section>
+    {children}
     <Showcase/>
     <section id="workflow" className="shell section" aria-labelledby="workflow-title"><div className="section-heading"><div><p className="eyebrow">HOW IT WORKS / 01</p><h2 id="workflow-title">{t('开始，其实很简单。','Simple from the start.')}</h2></div><p>{t('选对方案，完成设置，回到你的课程。','Pick your package, get set up, and get back to your classes.')}</p></div><div className="steps">{[
       [t('选择你的方案','Choose your package'),t('选择完整体验包，或单独购买扩展与手机通知。','Choose the complete bundle or buy the extension and notifications separately.')],
@@ -66,22 +55,14 @@ export function Landing(){
           <ul>{[t('Chrome ZIP 安装包','Chrome extension ZIP'),t('课表导入与课程任务','Timetable import & class tasks'),t('二维码 / Microsoft Forms 绑定','QR code / Microsoft Forms connection'),t('本地资料与历史记录','Local data & check-in history'),t('7 天有效的下载链接','Download link valid for 7 days')].map(x=><li key={x}>{x}</li>)}</ul>
           <BuyButton plan="extension" className="button secondary">{t('购买扩展','Get the extension')}</BuyButton>
         </article>
-        <article className="price-card featured">
-          <p className="eyebrow">STAY IN THE LOOP</p>
-          <div className="plan-heading"><h3>{t('手机通知服务','Mobile notifications')}</h3><span className="plan-badge">{t('扩展附加服务','EXTENSION ADD-ON')}</span></div>
-          <p>{t('不必一直看电脑，也能了解签到结果。','Check your phone, not your computer, for updates.')}</p>
-          <BillingSegmentedControl id="pricing-notification" value={selectedNotificationPlan} onChange={setSelectedNotificationPlan}/>
-          <NotificationPriceDisplay id="pricing-notification-price" context="pricing" billingPlan={selectedNotificationPlan}/>
-          <ul>{[t('执行、成功与失败提醒','Execution, success & failure updates'),t('错过时间与状态未知提醒','Missed & unknown-status alerts'),t('独立手机通知密钥','Your own notification key'),t('支持 iPhone 与 Android','For iPhone & Android'),t('配置教程与客服支持','Setup guides & customer support')].map(x=><li key={x}>{x}</li>)}</ul>
-          <BuyButton plan={selectedNotificationCode}>{notificationCta}</BuyButton>
-        </article>
+        <NotificationPricingCard/>
       </div>
       <p className="pricing-note">{t(`完整体验包含扩展与首学期通知；单独购买手机通知需已有扩展。续订 ${price(plans.mobile_notification.amount)} / 学期。当前为本地测试，不会扣款。`,`The bundle includes the extension and first notification semester. Standalone notifications require the extension; renewals are ${price(plans.mobile_notification.amount)} per semester. Local test only; no payment is collected.`)}</p>
     </section>
     <section id="product" className="shell section product-section" aria-labelledby="product-title"><div className="section-heading"><div><p className="eyebrow">THE DETAILS / 03</p><h2 id="product-title">{t('少一点重复，','Less repetition.')}<br/><span className="muted">{t('多一点安心。','More peace of mind.')}</span></h2></div><p>{t('从课表导入，到签到结果。每一步都清楚。','From your timetable to your results, every step stays clear.')}</p></div><MagicBento className="product-bento-grid" items={features.map(([title,body],i)=>({id:`feature-${i}`,className:`feature ${i===0||i===5?'bento-wide':''}`,content:<><span className="feature-number">0{i+1}</span><h3>{title}</h3><p>{body}</p>{(i===0||i===5)&&<div className="bento-format-list" aria-hidden="true">{(i===0?['PDF','JPG / JPEG','PNG']:['Windows','macOS','Chrome']).map(label=><span key={label}>{label}</span>)}</div>}</>}))}/><div className="product-workflow"><span>{t('上传课表','Import timetable')}</span><span aria-hidden>→</span><span>{t('绑定入口','Connect form')}</span><span aria-hidden>→</span><span>{t('填写资料','Add details')}</span><span aria-hidden>→</span><span>{t('确认任务','Confirm tasks')}</span><span aria-hidden>→</span><span>{t('执行签到','Check in')}</span></div></section>
     <section className="shell section"><div className="notification-banner"><div><p className="eyebrow">A LITTLE EXTRA PEACE OF MIND</p><h2>{t('结果，在手机上见。','Updates. In your pocket.')}</h2><p>{t('开通手机通知，完成一次 ntfy 设置。执行、成功、失败、错过时间或状态未知，及时掌握。','Add notifications and set up ntfy once. Get execution, success, failure, missed, and unknown-status updates on your phone.')}</p><a className="text-link" href="#tutorials">{t('查看手机配置教程','See the phone setup guides')} ↗</a></div><div className="phone-preview" aria-label={t('通知效果示意','Illustrative notification preview')}><span>9:41</span><div className="phone-notification"><Image src="/files/logo.png" alt="" width="32" height="32" sizes="32px" quality={100}/><div><small>AUTO-CHECK <span>now</span></small><strong>{t('签到成功','Check-in successful')}</strong><p>{t('课程签到已完成。安心上课吧。','Your class check-in is complete.')}</p></div></div><p className="phone-caption">{t('通知示意 · 实际状态以执行结果为准','Illustration · Actual results may vary')}</p></div></div></section>
     <section id="tutorials" className="shell section" aria-labelledby="tutorial-title"><div className="section-heading"><div><p className="eyebrow">GET SET UP / 04</p><h2 id="tutorial-title">{t('跟着做，轻松开始。','A guide for every step.')}</h2></div><p>{t('电脑安装与手机配置。点击图片查看完整教程。','Computer installation and phone setup. Open a guide to see every step.')}</p></div><div className="guide-grid">{guides.map(g=><button className="guide-card" key={g.src} onClick={()=>setGuide(g)}><div className="guide-image"><Image src={g.src} alt={g.title} width={1024} height={1536} sizes="(max-width:767px) calc(100vw - 44px), (max-width:1240px) calc((100vw - 105px)/2), 567px" quality={100} loading="lazy"/><span>{t('查看完整教程','View full guide')} ↗</span></div><div className="guide-caption"><p className="eyebrow">{g.label}</p><h3>{g.title}</h3><p>{g.sub}</p></div></button>)}</div><div className="video-section">{process.env.NEXT_PUBLIC_TUTORIAL_VIDEO_URL?<video controls preload="metadata" src={process.env.NEXT_PUBLIC_TUTORIAL_VIDEO_URL} aria-label={t('完整教学视频','Complete tutorial video')}/>:<><span className="video-play" aria-hidden>▷</span><div><p className="eyebrow">THE COMPLETE WALKTHROUGH</p><h3>{t('完整教学视频','The complete video guide')}</h3><p>{t('即将上线。现在可以先使用上面的图文教程。','Coming soon. Get started with the illustrated guides above.')}</p></div><span className="coming-soon">{t('即将上线','COMING SOON')}</span></>}</div></section>
-    <section className="shell section faq-section" aria-labelledby="faq-title"><div><p className="eyebrow">A FEW GOOD QUESTIONS / 05</p><h2 id="faq-title">{t('还有疑问？','Good questions.')}<br/><span className="muted">{t('这里有答案。','Clear answers.')}</span></h2><Link className="text-link" href="/support">{t('和我们聊聊','Talk to us')} ↗</Link></div><div className="faq-list">{faqs.map(([q,a])=><details key={q}><summary>{q}<span aria-hidden>+</span></summary><p>{a}</p></details>)}</div></section>
+    <section className="shell section faq-section" aria-labelledby="faq-title"><div><p className="eyebrow">A FEW GOOD QUESTIONS / 05</p><h2 id="faq-title">{t('还有疑问？','Good questions.')}<br/><span className="muted">{t('这里有答案。','Clear answers.')}</span></h2><Link prefetch={true} className="text-link" href="/support">{t('和我们聊聊','Talk to us')} ↗</Link></div><div className="faq-list">{faqs.map(([q,a])=><details key={q}><summary>{q}<span aria-hidden>+</span></summary><p>{a}</p></details>)}</div></section>
     <section className="shell final-cta"><p className="eyebrow">MAKE ROOM FOR WHAT MATTERS</p><h2>{t('课表安排好。','Timetable sorted.')}<br/><span className="muted">{t('下一节，安心上课。','Bring on the semester.')}</span></h2><a href="#pricing" className="button primary">{t('选择你的方案','Find your package')} ↗</a></section>
     <GuideViewer guide={guide} onClose={()=>setGuide(null)}/>
   </div>;
