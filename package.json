@@ -9,15 +9,18 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
+    "test:admin": "playwright test --config playwright.admin.config.ts",
     "test:perf": "npm run build && playwright test --config playwright.perf.config.ts",
     "test:performance-audit": "npm run build && playwright test --config playwright.audit.config.ts",
-    "test:ui:prod": "npm run build && playwright test --config playwright.production.config.ts"
+    "test:ui:prod": "npm run build && playwright test --config playwright.production.config.ts",
+    "dev:admin": "node scripts/admin-preview.mjs"
   },
   "engines": {
     "node": ">=24"
   },
   "dependencies": {
     "@paper-design/shaders-react": "0.0.81",
+    "@supabase/supabase-js": "2.117.2",
     "@tailwindcss/postcss": "4.3.3",
     "framer-motion": "14.0.0",
     "gsap": "3.15.0",
@@ -28,13 +31,17 @@
     "ogl": "^1.0.11",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "sharp": "0.35.5",
     "tailwindcss": "4.3.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "1.63.0",
     "@types/node": "26.6.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
     "tsx": "4.23.15",
     "typescript": "7.0.2"
   }

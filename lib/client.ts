@@ -15,6 +15,7 @@ export function errorCopy(error:unknown, t:(zh:string,en:string)=>string){
     UNAUTHORIZED:['密码不正确，或登录已过期。','Incorrect password, or your session has expired.'],
     RATE_LIMITED:['操作过于频繁，请一分钟后再试。','Too many attempts. Please try again in one minute.'],
     LOCAL_ONLY:['此功能仅在本地测试模式可用。','This feature is available only in local test mode.'],
+    CHECKOUT_UNAVAILABLE:['此方案暂时无法购买，请稍后再试。','This package is temporarily unavailable. Please try again later.'],
   };
   return messages[code]?t(...messages[code]):t('暂时无法完成操作，请重试。','Something went wrong. Please try again.');
 }

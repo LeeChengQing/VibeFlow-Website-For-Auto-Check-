@@ -16,7 +16,7 @@ export const HeroAmbientLogo=memo(function HeroAmbientLogo(){
     },{rootMargin:'100px'});
     observer.observe(ambient);return()=>{observer.disconnect();ambient.style.removeProperty('visibility');};
   },[]);
-  return <div ref={ambientRef} className={`hero-ambient ${styles.ambient}`} aria-hidden="true">
+  return <div ref={ambientRef} className={`hero-ambient contain-layout contain-paint transform-gpu ${styles.ambient}`} aria-hidden="true">
     <ElectricLogo src="/vibeflow-electric-mark.png" color="#00f2fe" glowColor="#4facfe"
       intensity={0.7} scale={0.85} strands={2} bend={0.35} crackle={0.6}
       arcs={0.25} flicker={0.15} speed={0.6} interactive={false}/>

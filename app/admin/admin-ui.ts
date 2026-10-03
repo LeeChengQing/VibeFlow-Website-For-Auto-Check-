@@ -1,0 +1,6 @@
+// Important utilities override the storefront's unlayered button reset.
+export const primaryButton = 'inline-flex min-h-11 items-center justify-center rounded-lg border! border-cyan-200/40! bg-cyan-300! px-5 py-3 text-sm font-semibold text-black! shadow-[0_0_24px_rgba(103,232,249,0.12)] transition-colors hover:bg-cyan-200! focus-visible:outline-cyan-200 disabled:cursor-wait disabled:opacity-50';
+export const secondaryButton = 'inline-flex min-h-11 items-center justify-center rounded-lg border! border-white/10! bg-white/5! px-4 py-2.5 text-sm text-white/70 hover:bg-white/10! hover:text-white disabled:opacity-40';
+export const field = 'min-h-11 w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60 focus-visible:outline-cyan-300 disabled:opacity-50';
+export const glassPanel = 'rounded-2xl border border-white/10 bg-white/[0.035] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] supports-[not(backdrop-filter:blur(1px))]:bg-zinc-950 [@media(prefers-reduced-transparency:reduce)]:bg-zinc-950 [@media(prefers-reduced-transparency:reduce)]:backdrop-blur-none';
+export const adminSurface = 'relative mx-auto my-8 max-w-[1440px] overflow-hidden rounded-3xl border border-white/10 bg-black p-5 text-white sm:p-8 lg:p-10';

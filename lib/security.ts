@@ -30,7 +30,7 @@ export function rateLimit(request: Request, scope:string, limit=60) {
 }
 export function apiError(error: unknown) {
   const code=error instanceof Error?error.message:'SERVER_ERROR';
-  const codes=['INVALID_EMAIL','INVALID_PLAN','INVALID_TEXT','INVALID_STATE','ORDER_MISMATCH','ORDER_EXPIRED','TICKET_CLOSED'];
+  const codes=['INVALID_EMAIL','INVALID_PLAN','INVALID_TEXT','INVALID_STATE','ORDER_MISMATCH','ORDER_EXPIRED','TICKET_CLOSED','CHECKOUT_UNAVAILABLE'];
   const status=code==='NOT_FOUND'?404:code==='UNAUTHORIZED'?401:code==='RATE_LIMITED'?429:['LOCAL_ONLY','INVALID_ORIGIN'].includes(code)?403:codes.includes(code)?400:500;
   return Response.json({error:status===500?'SERVER_ERROR':code},{status,headers:{'Cache-Control':'no-store'}});
 }

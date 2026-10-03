@@ -97,18 +97,19 @@ test('server ignores tampered prices and protects private/admin routes',async({r
 });
 
 test('complete extension checkout, create ticket, admin reply, resend and refund',async({page})=>{
-  await page.goto('/');await page.getByRole('button',{name:'Switch to English'}).click();
+  await page.addInitScript(()=>localStorage.setItem('vf-locale','en'));
+  await page.goto('/');
   await page.locator('#pricing').getByRole('button',{name:'Get the extension'}).click();await expect(page).toHaveURL(/\/checkout\//);
   await page.getByLabel('Delivery email', {exact:true}).fill('browser-test@example.com');await page.getByRole('button',{name:'Simulate successful payment'}).click();
   await expect(page).toHaveURL(/\/order\//);await expect(page.getByRole('heading',{name:'Simulated payment complete'})).toBeVisible();
   const orderUrl=page.url();const reference=await page.getByTestId('ticket-reference').innerText();
   await page.getByRole('link',{name:/^Order support/}).click();await page.getByLabel('Subject',{exact:true}).fill('Browser test setup question');await page.getByLabel('Message',{exact:true}).fill('Please help me with the setup guide.');await page.getByRole('button',{name:'Create support ticket'}).click();
   await expect(page).toHaveURL(/\/support\/[a-f0-9]+/);await expect(page.getByRole('heading',{name:'Browser test setup question'})).toBeVisible();const ticketUrl=page.url();
-  await page.goto('/admin');await page.getByLabel('Admin password',{exact:true}).fill('wrong-password');await page.getByRole('button',{name:/^Sign in/}).click();await expect(page.locator('form').getByRole('alert')).toHaveText('Incorrect password, or your session has expired.');
+  await page.goto('/admin/local');await page.getByLabel('Admin password',{exact:true}).fill('wrong-password');await page.getByRole('button',{name:/^Sign in/}).click();await expect(page.locator('form').getByRole('alert')).toHaveText('Incorrect password, or your session has expired.');
   await page.getByLabel('Admin password',{exact:true}).fill('Vibeflow-Local-2026!');await page.getByRole('button',{name:/^Sign in/}).click();await expect(page.getByRole('heading',{name:'Your dashboard'})).toBeVisible();
   await page.getByRole('tab',{name:/Support tickets/}).click();await page.getByLabel('Search orders or tickets').fill('browser-test@example.com');await page.getByRole('button',{name:'View ticket'}).first().click();await page.getByLabel('Reply to customer',{exact:true}).fill('Your installation guide is ready. Follow the Windows steps.');await page.getByRole('button',{name:'Save reply'}).click();await expect(page.getByRole('status')).toHaveText('Saved.');
   await page.goto(ticketUrl);await expect(page.getByText('Your installation guide is ready. Follow the Windows steps.')).toBeVisible();
-  await page.goto('/admin');await page.getByLabel('Search orders or tickets').fill(reference);await page.getByRole('button',{name:'Manage order'}).click();await page.getByLabel('Correct delivery email',{exact:true}).fill('corrected@example.com');await page.getByRole('button',{name:'Update & resend preview'}).click();await expect(page.getByRole('status')).toContainText('Delivery preview refreshed');await page.getByRole('button',{name:'Simulate refund'}).click();await expect(page.getByRole('status')).toContainText('Simulated order refunded');
+  await page.goto('/admin/local');await page.getByLabel('Search orders or tickets').fill(reference);await page.getByRole('button',{name:'Manage order'}).click();await page.getByLabel('Correct delivery email',{exact:true}).fill('corrected@example.com');await page.getByRole('button',{name:'Update & resend preview'}).click();await expect(page.getByRole('status')).toContainText('Delivery preview refreshed');await page.getByRole('button',{name:'Simulate refund'}).click();await expect(page.getByRole('status')).toContainText('Simulated order refunded');
   await page.goto(orderUrl);await expect(page.getByRole('heading',{name:'Order refunded'})).toBeVisible();await expect(page.locator('.delivery-preview')).toHaveCount(0);
 });
 
@@ -198,8 +199,8 @@ test('hero recommends the complete bundle while keeping notification plans optio
   await page.goto('/');await page.getByRole('button',{name:'Switch to English'}).click();
   const hero=page.locator('.hero-checkout');await expect(hero.getByRole('radio',{name:/Complete experience bundle/})).toHaveAttribute('aria-checked','true');
   await expect(hero).toContainText('RM 30.00');await expect(hero).toContainText('Extension + first semester notifications');
-  await expect(hero.locator('.mini-bundle-original-price')).toHaveText('RM 36.98');
-  await expect(hero.locator('.mini-bundle-promo')).toContainText('LIMITED-TIME DEAL');await expect(hero.locator('.mini-bundle-promo')).toContainText('Save RM 6.98');
+  await expect(hero.locator('.mini-bundle-original-price')).toHaveText('RM 35.00');
+  await expect(hero.locator('.mini-bundle-promo')).toContainText('LIMITED-TIME DEAL');await expect(hero.locator('.mini-bundle-promo')).toContainText('Save RM 5.00');
   await expect(hero.locator('.mini-bundle-countdown')).toHaveText(/^\d+d \d{2}h \d{2}m \d{2}s$/);
   await hero.getByRole('button',{name:'Get complete bundle'}).click();await expect(page).toHaveURL(/\/checkout\//);await expect(page.locator('.order-total strong')).toHaveText('RM 30.00');
   await page.goto('/');const notificationHero=page.locator('.hero-checkout');await notificationHero.getByRole('radio',{name:/Mobile notifications/}).click();

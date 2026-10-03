@@ -1,9 +1,12 @@
 node_modules/
 .next/
 .next-e2e/
+.next-admin-e2e/
+.next-admin-test/
 .env*
 !.env.example
 .local/
+supabase/.temp/
 test-results/
 playwright-report/
 .superpowers/

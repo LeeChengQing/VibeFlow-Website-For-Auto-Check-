@@ -2,40 +2,39 @@
 
 import { memo } from 'react';
 import { useLocale } from './LocaleProvider';
+import { useSiteConfig } from './SiteConfigProvider';
 
 export const LeftHeroText = memo(function LeftHeroText() {
-  const { t } = useLocale();
+  const { locale } = useLocale();
+  const { config: { hero } } = useSiteConfig();
 
   return (
     <div className="hero-copy">
       <p className="eyebrow">
         <span className="status-dot" />
-        {t('为学生的日常，少一点琐碎', 'LESS ADMIN. MORE STUDENT LIFE.')}
+        {hero.eyebrow[locale]}
       </p>
-      <h1 id="hero-title" aria-label={t('一次配置， 告别签到遗漏。', 'Set it up. Stay on track.')}>
+      <h1 id="hero-title" aria-label={`${hero.line1[locale]} ${hero.line2[locale]}`}>
         <div className="hero-line-mask" aria-hidden="true">
-          <span className="hero-line">{t('一次配置，', 'Set it up.')}</span>
+          <span className="hero-line">{hero.line1[locale]}</span>
         </div>
         <div className="hero-line-mask" aria-hidden="true">
-          <span className="hero-line hero-line-accent">{t('告别签到遗漏。', 'Stay on track.')}</span>
+          <span className="hero-line hero-line-accent">{hero.line2[locale]}</span>
         </div>
       </h1>
       <p className="hero-description">
-        {t(
-          '让课表与签到自然衔接。为 Southampton / UoSM 学生设计的课程签到辅助，把重复操作交给 Auto-Check。',
-          'Bring your timetable and check-ins together. Auto-Check takes the repetition out of your class routine at Southampton / UoSM.',
-        )}
+        {hero.description[locale]}
       </p>
       <div className="hero-buttons">
         <a className="button primary" href="#pricing">
-          {t('选择你的方案', 'Find your package')} <span aria-hidden>↗</span>
+          {hero.primaryButton[locale]} <span aria-hidden>↗</span>
         </a>
         <a className="button secondary" href="#workflow">
-          {t('了解使用流程', 'See how it works')} <span aria-hidden>↓</span>
+          {hero.secondaryButton[locale]} <span aria-hidden>↓</span>
         </a>
       </div>
       <p className="hero-note">
-        {t('Windows & macOS · 本地保存资料 · 无需注册账号', 'Windows & macOS · Local data · No account required')}
+        {hero.note[locale]}
       </p>
     </div>
   );

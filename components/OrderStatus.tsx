@@ -79,10 +79,11 @@ export function OrderStatus({ token }: { token: string }) {
       {isPaid && <section className="delivery-preview order-delivery-column" aria-labelledby="delivery-preview-title">
         <h2 id="delivery-preview-title">{t('交付内容预览', 'Delivery preview')}</h2>
         {expired ? <p>{t('链接已过期，请联系客服重新处理。', 'The link has expired. Please contact support.')}</p> : <>
-          {order.plan === 'extension' && <p>{t('正式接通后，此处会提供有效期为 7 天的安全 ZIP 下载链接。当前未附带真实扩展文件。', 'Once live services are connected, a secure ZIP link valid for 7 days will appear here. No real extension file is attached.')}</p>}
+          {(order.plan === 'extension' || order.plan === 'bundle') && order.extensionRelease && <a className="button primary" href={`/api/site/download/${order.token}`}>{t('下载扩展 ZIP', 'Download extension ZIP')} · {order.extensionRelease.label}</a>}
+          {order.plan === 'extension' && !order.extensionRelease && <p>{t('正式接通后，此处会提供有效期为 7 天的安全 ZIP 下载链接。当前未附带真实扩展文件。', 'Once live services are connected, a secure ZIP link valid for 7 days will appear here. No real extension file is attached.')}</p>}
           {isNotificationPlan(order.plan) && <><p className="delivery-key">{order.delivery}</p><p>{t('DEMO 密钥仅用于测试，无法激活手机通知。', 'This DEMO key is a test value and cannot activate notifications.')}</p></>}
           {order.plan === 'bundle' && <>
-            <p>{t('扩展：这里会提供有效期为 7 天的安全 ZIP 下载链接。当前未附带真实扩展文件。', 'Extension: a secure ZIP download link valid for 7 days would appear here. No real extension file is attached.')}</p>
+            {!order.extensionRelease && <p>{t('扩展：这里会提供有效期为 7 天的安全 ZIP 下载链接。当前未附带真实扩展文件。', 'Extension: a secure ZIP download link valid for 7 days would appear here. No real extension file is attached.')}</p>}
             <p className="delivery-key-label">{t('首学期手机通知 DEMO 密钥：', 'First-semester mobile notification DEMO key: ')}</p>
             <p className="delivery-key">{order.delivery}</p>
             <p>{t('DEMO 密钥仅用于测试，无法激活手机通知。', 'This DEMO key is for testing only and cannot activate mobile notifications.')}</p>

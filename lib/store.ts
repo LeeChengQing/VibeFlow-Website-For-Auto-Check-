@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { getPlanAmount, isPlan } from './plans';
+import { packagePrice, purchaseAllowed, type SiteConfig } from './site-config';
 import type { Order, Ticket } from './types';
 export type { Order, Ticket } from './types';
 
@@ -30,9 +31,14 @@ function text(value: unknown, min: number, max: number) {
   if (typeof value !== 'string' || value.trim().length < min || value.trim().length > max) throw new Error('INVALID_TEXT');
   return value.trim();
 }
-export function createOrder(input: {plan:unknown; locale:unknown; period?:unknown}): Order {
-  if (!isPlan(input.plan) || input.period === 'degree') throw new Error('INVALID_PLAN');
-  const o: Order = { id:randomUUID(), token:token(), reference:`VF-${randomBytes(6).toString('hex').toUpperCase()}`, plan:input.plan, amount:getPlanAmount(input.plan), locale:input.locale==='en'?'en':'zh', email:'', status:'pending', createdAt:now(), paidAt:null, expiresAt:null, delivery:null, resends:0 };
+export function createOrder(input: {plan:unknown; locale:unknown; period?:unknown}, config?: SiteConfig): Order {
+  if (!input || !isPlan(input.plan) || input.period === 'degree') throw new Error('INVALID_PLAN');
+  if (config && !purchaseAllowed(config, input.plan)) throw new Error('CHECKOUT_UNAVAILABLE');
+  const amount = config ? packagePrice(config, input.plan) : getPlanAmount(input.plan);
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > 99999999) throw new Error('INVALID_PLAN');
+  const release = config?.settings.extensionRelease;
+  const extensionRelease = (input.plan === 'extension' || input.plan === 'bundle') && release ? { assetId: release.assetId, label: release.label } : null;
+  const o: Order = { id:randomUUID(), token:token(), reference:`VF-${randomBytes(6).toString('hex').toUpperCase()}`, plan:input.plan, amount, extensionRelease, locale:input.locale==='en'?'en':'zh', email:'', status:'pending', createdAt:now(), paidAt:null, expiresAt:null, delivery:null, resends:0 };
   db.prepare('INSERT INTO orders (id,token,reference,data) VALUES (?,?,?,?)').run(o.id,o.token,o.reference,JSON.stringify(o));
   return o;
 }
@@ -59,7 +65,7 @@ export function completeOrder(accessToken: string, email: unknown): Order {
 }
 export function cancelOrder(accessToken: string) { return transaction(() => { const o=requireOrder(accessToken); if(o.status!=='pending') throw new Error('INVALID_STATE'); o.status='cancelled'; return saveOrder(o); }); }
 export function refundOrder(id: string) { return transaction(() => { const o=orderById(id); if(o.status!=='paid') throw new Error('INVALID_STATE'); o.status='refunded'; o.delivery=null; o.expiresAt=null; return saveOrder(o); }); }
-export function resendOrder(id: string, correctedEmail?: unknown) { return transaction(() => { const o=orderById(id); if(o.status!=='paid') throw new Error('INVALID_STATE'); if(correctedEmail) o.email=normalizeEmail(correctedEmail); o.resends++; o.expiresAt=new Date(Date.now()+7*86400000).toISOString(); return saveOrder(o); }); }
+export function resendOrder(id: string, correctedEmail?: unknown) { return transaction(() => { const o=orderById(id); if(o.status!=='paid') throw new Error('INVALID_STATE'); if(correctedEmail !== undefined) o.email=normalizeEmail(correctedEmail); o.resends++; o.expiresAt=new Date(Date.now()+7*86400000).toISOString(); return saveOrder(o); }); }
 export function createTicket(input: {email:unknown; reference:unknown; subject:unknown; message:unknown; locale:unknown}): Ticket {
   const email=normalizeEmail(input.email); const reference=typeof input.reference==='string'?input.reference.trim().toUpperCase():'';
   if(reference) {
@@ -77,4 +83,5 @@ export function replyTicket(id: string, body:unknown, author:'admin'|'customer')
   if(t.status==='closed') throw new Error('TICKET_CLOSED');
   t.messages.push({id:randomUUID(),author,body:text(body,1,4000),createdAt:now()}); return saveTicket(t);
 }); }
-export function closeTicket(id: string) { return transaction(() => { const t=decode<Ticket>(db.prepare('SELECT data FROM tickets WHERE id=?').get(id)); if(!t) throw new Error('NOT_FOUND'); t.status='closed'; return saveTicket(t); }); }
+export function closeTicket(id: string) { return transaction(() => { const t=decode<Ticket>(db.prepare('SELECT data FROM tickets WHERE id=?').get(id)); if(!t) throw new Error('NOT_FOUND'); if(t.status!=='open') throw new Error('INVALID_STATE'); t.status='closed'; return saveTicket(t); }); }
+export function reopenTicket(id: string) { return transaction(() => { const t=decode<Ticket>(db.prepare('SELECT data FROM tickets WHERE id=?').get(id)); if(!t) throw new Error('NOT_FOUND'); if(t.status!=='closed') throw new Error('INVALID_STATE'); t.status='open'; return saveTicket(t); }); }

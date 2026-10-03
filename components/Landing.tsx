@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import { useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { getPlanAmount, plans, price } from '@/lib/plans';
+import { displayAmount, price } from '@/lib/plans';
 import { useLocale } from './LocaleProvider';
 import { Showcase } from './Showcase';
 import { BuyButton } from './BuyButton';
@@ -11,31 +11,40 @@ import { NotificationPricingCard } from './NotificationPricingCard';
 import { GuideViewer } from './GuideViewer';
 import { useLandingMotion } from './useLandingMotion';
 import { MagicBento } from './MagicBento';
+import { usePackagePrice, useSiteConfig } from './SiteConfigProvider';
+
+function ExtensionPricingCard() {
+  const { locale,t }=useLocale(); const {config}=useSiteConfig();
+  const plan=config.packages.find(item=>item.id==='extension')!;
+  const amount=usePackagePrice('extension');
+  if(!plan.visible)return null;
+  return <article className="price-card">
+    <p className="eyebrow">THE ESSENTIAL</p>
+    <div className="plan-heading"><h3>{plan.name[locale]}</h3>{plan.badge[locale]&&<span className="plan-badge">{plan.badge[locale]}</span>}</div>
+    <p>{plan.description[locale]}</p>
+    {amount<plan.amount&&<del>{price(plan.amount)}</del>}
+    <div className="price"><span>RM</span>{displayAmount(amount)}<small>/ {t('一次买断','one-time')}</small></div>
+    <ul>{plan.features.map((item,index)=><li key={index}>{item[locale]}</li>)}</ul>
+    <BuyButton plan="extension" className="button secondary">{t('购买扩展','Get the extension')}</BuyButton>
+  </article>;
+}
+
 export function Landing({children}:{children:ReactNode}){
-  const {t,locale}=useLocale();const [guide,setGuide]=useState<{src:string;title:string}|null>(null);
+  const {t,locale,setLocale}=useLocale();const [guide,setGuide]=useState<{src:string;title:string;alt:string}|null>(null);
+  const {config,preview}=useSiteConfig();
   const rootRef=useRef<HTMLDivElement>(null);useLandingMotion(rootRef,locale);
-  const features=[
-    [t('你的课表，一次导入','One timetable. One setup.'),t('支持 PDF、JPG、JPEG、PNG，识别课程、星期和时间，并允许手动修改。','Import PDF, JPG, JPEG, or PNG. Review detected classes, days, and times, then make any edits.')],
-    [t('连接你的签到入口','Connect your check-in'),t('上传课程二维码或粘贴 Microsoft Forms 链接，匹配 Lecture、Tutorial 和 Lab。','Upload a course QR code or paste a Microsoft Forms link. Match Lectures, Tutorials, and Labs.')],
-    [t('每周任务，清晰可见','Your week, laid out'),t('保存学生资料，自动生成每周课程任务，确认后按课程时间执行。','Save your student details, generate weekly tasks, and confirm them before scheduled execution.')],
-    [t('结果明确，不猜状态','Clear results, less guessing'),t('仅在 Forms 明确提交成功时显示成功；失败、错过时间和状态未知分别提示。','Success appears only when Forms confirms submission. Failures, missed times, and unknown results stay distinct.')],
-    [t('记录留在你手中','A record you can check'),t('查看课程绑定状态和历史签到记录，资料保存在本地 Chrome 中。','Check course connections and past results. Your student information stays in local Chrome storage.')],
-    [t('适配你现有的电脑','Made for your computer'),t('支持 Windows 和 macOS，使用 Chrome 扩展，无需安装 Node.js 或注册云端账号。','Works in Chrome on Windows and macOS. No Node.js installation or cloud account needed.')],
-  ];
-  const guides=[
-    {src:'/files/chrome-windows.jpg',title:t('Chrome 插件安装 · Windows','Chrome extension · Windows'),sub:t('下载 ZIP → 解压 → 开发者模式 → 加载已解压的扩展','Download ZIP → Unzip → Developer mode → Load unpacked'),label:'01 / WINDOWS'},
-    {src:'/files/chrome-mac.jpg',title:t('Chrome 插件安装 · macOS','Chrome extension · macOS'),sub:t('下载 ZIP → 解压 → 打开扩展程序 → 加载已解压的扩展','Download ZIP → Unzip → Open extensions → Load unpacked'),label:'02 / MACOS'},
-    {src:'/files/ntfy-iphone.jpg',title:t('手机通知配置 · iPhone','Mobile notifications · iPhone'),sub:t('安装 ntfy → 添加 Topic → 允许通知','Install ntfy → Add your topic → Allow notifications'),label:'03 / IPHONE'},
-    {src:'/files/ntfy-android.jpg',title:t('手机通知配置 · Android','Mobile notifications · Android'),sub:t('安装 ntfy → 扫描二维码 → 测试通知','Install ntfy → Scan the QR code → Test notifications'),label:'04 / ANDROID'},
-  ];
-  const faqs=[
-    [t('需要同时买扩展和手机通知吗？','Do I need to buy the extension and notifications separately?'),t('不需要。完整体验包包含扩展和首学期手机通知；单独购买手机通知时，需要已有课程签到扩展。','No. The complete bundle includes the extension and first semester of notifications. A standalone notification plan requires the extension.')],
-    [t('完整体验包包含什么？','What does the complete bundle include?'),t(`包含一次买断的课程签到扩展和首学期手机通知。限时价 ${price(getPlanAmount('bundle'))}；优惠结束后 ${price(plans.bundle.amount)}。之后续订手机通知为 ${price(plans.mobile_notification.amount)} / 学期。`,`It includes the one-time extension and the first semester of mobile notifications. The offer is ${price(getPlanAmount('bundle'))}, then ${price(plans.bundle.amount)} after it ends. Notification renewals are ${price(plans.mobile_notification.amount)} per semester.`)],
-    [t('付款后如何获取内容？','How is my purchase delivered?'),t('完整体验包会包含扩展 ZIP 下载预览和手机通知 DEMO 密钥；正式服务接通后，扩展链接有效 7 天。当前本地版本不会发送邮件或提供真实文件、密钥。','The bundle preview includes an extension ZIP link and a mobile notification DEMO key. Live extension links will be valid for 7 days. This local version sends no email and provides no real files or keys.')],
-    [t('电脑需要一直开着吗？','Does my computer need to stay on?'),t('需要。在签到时间保持电脑开机、联网，并确保 Chrome 和扩展可运行。手机通知不会替代电脑执行签到。','Yes. Keep your computer awake, online, and Chrome available at check-in time. Phone notifications do not perform the check-in themselves.')],
-    [t('遇到问题如何联系客服？','How do I get help?'),t('点击右下角的动态球或联系客服。提供邮箱及订单号，我们可以查看问题并在工单内回复。请保存你的专属工单链接。','Use the animated orb or the support link. Include your email and order reference, and keep your private ticket link to view replies.')],
-  ];
+  const features=config.content.features.map(item=>[item.title[locale],item.description[locale]]);
+  const guides=config.guides.filter(item=>item.visible).sort((a,b)=>a.order-b.order).map(item=>({...item,title:item.title[locale],sub:item.description[locale],alt:item.alt[locale]}));
+  const faqs=config.content.faqs.filter(item=>item.visible);
+  const notificationPackages=config.packages.filter(item=>item.visible&&(item.id==='mobile_notification'||item.id==='mobile_notification_yearly')).sort((a,b)=>a.order-b.order);
+  const cards=config.packages.filter(item=>item.visible&&(item.id==='bundle'||item.id==='extension')).map(item=>({id:item.id,order:item.order}));
+  if(notificationPackages.length)cards.push({id:notificationPackages[0].id,order:notificationPackages[0].order});
+  cards.sort((a,b)=>a.order-b.order);
   return <div className="landing" ref={rootRef}>
+    {preview&&<div className="shell panel" role="status">{t('草稿预览 · 结账已禁用','Draft preview · Checkout disabled')} <button type="button" className="button small secondary" onClick={()=>setLocale(locale==='zh'?'en':'zh')}>{locale==='zh'?'Preview in English':'预览中文'}</button></div>}
+    {config.settings.maintenance&&<div className="shell panel" role="status">{config.settings.maintenanceMessage[locale]}</div>}
+    {config.content.announcementEnabled&&<div className="shell panel" role="status">{config.content.announcement[locale]}</div>}
+    {!config.settings.checkoutEnabled&&!config.settings.maintenance&&!preview&&<div className="shell panel" role="status">{t('结账暂不可用，请稍后再来。','Checkout is currently unavailable. Please check back soon.')}</div>}
     {children}
     <Showcase/>
     <section id="workflow" className="shell section" aria-labelledby="workflow-title"><div className="section-heading"><div><p className="eyebrow">HOW IT WORKS / 01</p><h2 id="workflow-title">{t('开始，其实很简单。','Simple from the start.')}</h2></div><p>{t('选对方案，完成设置，回到你的课程。','Pick your package, get set up, and get back to your classes.')}</p></div><div className="steps">{[
@@ -46,23 +55,14 @@ export function Landing({children}:{children:ReactNode}){
     <section id="pricing" className="shell section pricing-section" aria-labelledby="pricing-title">
       <div className="section-heading"><div><p className="eyebrow">YOUR PACKAGE / 02</p><h2 id="pricing-title">{t('选择适合你的方式。','Just what you need.')}</h2></div><p>{t('完整体验包优惠，或按需单独选择扩展与手机通知。','Choose the bundle offer or pick either individual plan.')}</p></div>
       <div className="pricing-grid">
-        <BundleOfferCard/>
-        <article className="price-card">
-          <p className="eyebrow">THE ESSENTIAL</p>
-          <div className="plan-heading"><h3>{t('浏览器扩展','Browser extension')}</h3><span className="plan-badge">{t('一次买断','YOURS TO KEEP')}</span></div>
-          <p>{t('把每周签到，变成更简单的日常。','A simpler routine for your weekly class check-ins.')}</p>
-          <div className="price"><span>RM</span>{(plans.extension.amount / 100).toFixed(2)}<small>/ {t('一次买断','one-time')}</small></div>
-          <ul>{[t('Chrome ZIP 安装包','Chrome extension ZIP'),t('课表导入与课程任务','Timetable import & class tasks'),t('二维码 / Microsoft Forms 绑定','QR code / Microsoft Forms connection'),t('本地资料与历史记录','Local data & check-in history'),t('7 天有效的下载链接','Download link valid for 7 days')].map(x=><li key={x}>{x}</li>)}</ul>
-          <BuyButton plan="extension" className="button secondary">{t('购买扩展','Get the extension')}</BuyButton>
-        </article>
-        <NotificationPricingCard/>
+        {cards.map(item=>item.id==='bundle'?<BundleOfferCard key={item.id}/>:item.id==='extension'?<ExtensionPricingCard key={item.id}/>:<NotificationPricingCard key="notification"/>)}
       </div>
-      <p className="pricing-note">{t(`完整体验包含扩展与首学期通知；单独购买手机通知需已有扩展。续订 ${price(plans.mobile_notification.amount)} / 学期。当前为本地测试，不会扣款。`,`The bundle includes the extension and first notification semester. Standalone notifications require the extension; renewals are ${price(plans.mobile_notification.amount)} per semester. Local test only; no payment is collected.`)}</p>
+      <p className="pricing-note">{config.content.purchaseNotice[locale]}</p>
     </section>
     <section id="product" className="shell section product-section" aria-labelledby="product-title"><div className="section-heading"><div><p className="eyebrow">THE DETAILS / 03</p><h2 id="product-title">{t('少一点重复，','Less repetition.')}<br/><span className="muted">{t('多一点安心。','More peace of mind.')}</span></h2></div><p>{t('从课表导入，到签到结果。每一步都清楚。','From your timetable to your results, every step stays clear.')}</p></div><MagicBento className="product-bento-grid" items={features.map(([title,body],i)=>({id:`feature-${i}`,className:`feature ${i===0||i===5?'bento-wide':''}`,content:<><span className="feature-number">0{i+1}</span><h3>{title}</h3><p>{body}</p>{(i===0||i===5)&&<div className="bento-format-list" aria-hidden="true">{(i===0?['PDF','JPG / JPEG','PNG']:['Windows','macOS','Chrome']).map(label=><span key={label}>{label}</span>)}</div>}</>}))}/><div className="product-workflow"><span>{t('上传课表','Import timetable')}</span><span aria-hidden>→</span><span>{t('绑定入口','Connect form')}</span><span aria-hidden>→</span><span>{t('填写资料','Add details')}</span><span aria-hidden>→</span><span>{t('确认任务','Confirm tasks')}</span><span aria-hidden>→</span><span>{t('执行签到','Check in')}</span></div></section>
     <section className="shell section"><div className="notification-banner"><div><p className="eyebrow">A LITTLE EXTRA PEACE OF MIND</p><h2>{t('结果，在手机上见。','Updates. In your pocket.')}</h2><p>{t('开通手机通知，完成一次 ntfy 设置。执行、成功、失败、错过时间或状态未知，及时掌握。','Add notifications and set up ntfy once. Get execution, success, failure, missed, and unknown-status updates on your phone.')}</p><a className="text-link" href="#tutorials">{t('查看手机配置教程','See the phone setup guides')} ↗</a></div><div className="phone-preview" aria-label={t('通知效果示意','Illustrative notification preview')}><span>9:41</span><div className="phone-notification"><Image src="/files/logo.png" alt="" width="32" height="32" sizes="32px" quality={100}/><div><small>AUTO-CHECK <span>now</span></small><strong>{t('签到成功','Check-in successful')}</strong><p>{t('课程签到已完成。安心上课吧。','Your class check-in is complete.')}</p></div></div><p className="phone-caption">{t('通知示意 · 实际状态以执行结果为准','Illustration · Actual results may vary')}</p></div></div></section>
-    <section id="tutorials" className="shell section" aria-labelledby="tutorial-title"><div className="section-heading"><div><p className="eyebrow">GET SET UP / 04</p><h2 id="tutorial-title">{t('跟着做，轻松开始。','A guide for every step.')}</h2></div><p>{t('电脑安装与手机配置。点击图片查看完整教程。','Computer installation and phone setup. Open a guide to see every step.')}</p></div><div className="guide-grid">{guides.map(g=><button className="guide-card" key={g.src} onClick={()=>setGuide(g)}><div className="guide-image"><Image src={g.src} alt={g.title} width={1024} height={1536} sizes="(max-width:767px) calc(100vw - 44px), (max-width:1240px) calc((100vw - 105px)/2), 567px" quality={100} loading="lazy"/><span>{t('查看完整教程','View full guide')} ↗</span></div><div className="guide-caption"><p className="eyebrow">{g.label}</p><h3>{g.title}</h3><p>{g.sub}</p></div></button>)}</div><div className="video-section">{process.env.NEXT_PUBLIC_TUTORIAL_VIDEO_URL?<video controls preload="metadata" src={process.env.NEXT_PUBLIC_TUTORIAL_VIDEO_URL} aria-label={t('完整教学视频','Complete tutorial video')}/>:<><span className="video-play" aria-hidden>▷</span><div><p className="eyebrow">THE COMPLETE WALKTHROUGH</p><h3>{t('完整教学视频','The complete video guide')}</h3><p>{t('即将上线。现在可以先使用上面的图文教程。','Coming soon. Get started with the illustrated guides above.')}</p></div><span className="coming-soon">{t('即将上线','COMING SOON')}</span></>}</div></section>
-    <section className="shell section faq-section" aria-labelledby="faq-title"><div><p className="eyebrow">A FEW GOOD QUESTIONS / 05</p><h2 id="faq-title">{t('还有疑问？','Good questions.')}<br/><span className="muted">{t('这里有答案。','Clear answers.')}</span></h2><Link prefetch={true} className="text-link" href="/support">{t('和我们聊聊','Talk to us')} ↗</Link></div><div className="faq-list">{faqs.map(([q,a])=><details key={q}><summary>{q}<span aria-hidden>+</span></summary><p>{a}</p></details>)}</div></section>
+    <section id="tutorials" className="shell section" aria-labelledby="tutorial-title"><div className="section-heading"><div><p className="eyebrow">GET SET UP / 04</p><h2 id="tutorial-title">{t('跟着做，轻松开始。','A guide for every step.')}</h2></div><p>{t('电脑安装与手机配置。点击图片查看完整教程。','Computer installation and phone setup. Open a guide to see every step.')}</p></div><div className="guide-grid">{guides.map(g=><button className="guide-card" key={g.src} onClick={()=>setGuide(g)}><div className="guide-image"><Image src={g.src} alt={g.alt} unoptimized={g.src.startsWith('/api/')} width={1024} height={1536} sizes="(max-width:767px) calc(100vw - 44px), (max-width:1240px) calc((100vw - 105px)/2), 567px" quality={100} loading="lazy"/><span>{t('查看完整教程','View full guide')} ↗</span></div><div className="guide-caption"><p className="eyebrow">{g.label}</p><h3>{g.title}</h3><p>{g.sub}</p></div></button>)}</div><div className="video-section">{config.settings.videoUrl?<video controls preload="metadata" src={config.settings.videoUrl} aria-label={t('完整教学视频','Complete tutorial video')}/>:<><span className="video-play" aria-hidden>▷</span><div><p className="eyebrow">THE COMPLETE WALKTHROUGH</p><h3>{t('完整教学视频','The complete video guide')}</h3><p>{t('即将上线。现在可以先使用上面的图文教程。','Coming soon. Get started with the illustrated guides above.')}</p></div><span className="coming-soon">{t('即将上线','COMING SOON')}</span></>}</div></section>
+    <section className="shell section faq-section" aria-labelledby="faq-title"><div><p className="eyebrow">A FEW GOOD QUESTIONS / 05</p><h2 id="faq-title">{t('还有疑问？','Good questions.')}<br/><span className="muted">{t('这里有答案。','Clear answers.')}</span></h2>{config.settings.supportUrl&&<Link prefetch={true} className="text-link" href={config.settings.supportUrl}>{t('和我们聊聊','Talk to us')} ↗</Link>}{config.settings.supportEmail&&<p><a className="text-link" href={`mailto:${config.settings.supportEmail}`}>{config.settings.supportEmail}</a></p>}</div><div className="faq-list">{faqs.map(item=><details key={item.id}><summary>{item.question[locale]}<span aria-hidden>+</span></summary><p>{item.answer[locale]}</p></details>)}</div></section>
     <section className="shell final-cta"><p className="eyebrow">MAKE ROOM FOR WHAT MATTERS</p><h2>{t('课表安排好。','Timetable sorted.')}<br/><span className="muted">{t('下一节，安心上课。','Bring on the semester.')}</span></h2><a href="#pricing" className="button primary">{t('选择你的方案','Find your package')} ↗</a></section>
     <GuideViewer guide={guide} onClose={()=>setGuide(null)}/>
   </div>;

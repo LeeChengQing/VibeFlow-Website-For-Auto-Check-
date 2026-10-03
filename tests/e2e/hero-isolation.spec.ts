@@ -24,6 +24,8 @@ test(`package selection preserves the hero text and canvas at ${viewport.width}p
   await page.goto('/');
   const canvas = page.locator('.hero-ambient canvas');
   await expect(canvas).toBeAttached();
+  await expect(page.locator('.hero-ambient')).toHaveCSS('contain', 'layout paint');
+  await expect(page.locator('.hero-ambient')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
   await expect(page.locator('.hero-line').first()).toHaveCSS('opacity', '1');
   await expect(page.locator('[data-page-transition]')).toHaveCSS('transform', 'none');
   await page.waitForTimeout(300);
@@ -40,6 +42,12 @@ test(`package selection preserves the hero text and canvas at ${viewport.width}p
   for (const name of [/Browser extension/, /Mobile notifications/, /Complete experience bundle/]) {
     await card.getByRole('radio', { name }).click();
     await expect(card.getByRole('radio', { name })).toHaveAttribute('aria-checked', 'true');
+    if (name.source === 'Mobile notifications') {
+      for (const period of ['Semester', 'Yearly']) {
+        await card.getByRole('tab', { name: period, exact: true }).click();
+        await expect(card.getByRole('tab', { name: period, exact: true })).toHaveAttribute('aria-selected', 'true');
+      }
+    }
     await page.waitForTimeout(450);
     const next = await geometry();
     expect(Math.abs(next.top - initial.top)).toBeLessThan(1);

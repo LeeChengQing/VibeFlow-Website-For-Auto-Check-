@@ -3,9 +3,10 @@
 import { useRef } from 'react';
 import {useReducedMotion} from 'framer-motion';
 import * as m from 'framer-motion/m';
-import { notificationBillingOptions, type NotificationBillingPlan } from '@/lib/plans';
+import { type NotificationBillingPlan } from '@/lib/plans';
 import { useLocale } from './LocaleProvider';
 import { billingPeriodText, purchaseText } from '@/lib/purchaseLocale';
+import { notificationOptions, useSiteConfig } from './SiteConfigProvider';
 
 export function BillingSegmentedControl({
   value,
@@ -18,6 +19,8 @@ export function BillingSegmentedControl({
 }) {
   const { locale } = useLocale();
   const shouldReduceMotion = useReducedMotion();
+  const { config } = useSiteConfig();
+  const notificationBillingOptions = notificationOptions(config);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = notificationBillingOptions.findIndex(option => option.id === value);
 
@@ -31,13 +34,26 @@ export function BillingSegmentedControl({
 
     event.preventDefault();
     const next = notificationBillingOptions[nextIndex];
+    if (!next.enabled) {
+      const direction = event.key === 'ArrowLeft' || event.key === 'End' ? -1 : 1;
+      for (let offset = 1; offset < notificationBillingOptions.length; offset++) {
+        const candidateIndex = (nextIndex + direction * offset + notificationBillingOptions.length) % notificationBillingOptions.length;
+        if (notificationBillingOptions[candidateIndex].enabled) {
+          onChange(notificationBillingOptions[candidateIndex].id);
+          tabRefs.current[candidateIndex]?.focus();
+          return;
+        }
+      }
+      return;
+    }
     onChange(next.id);
     tabRefs.current[nextIndex]?.focus();
   }
 
+  if (!notificationBillingOptions.length) return null;
   return <div className="billing-segmented-control" role="tablist" aria-label={purchaseText(locale, 'mobileBillingLabel')}>
       <m.span className="billing-segment-active" aria-hidden="true" initial={false}
-        style={{width:'calc((100% - 6px) / 2)',left:3,top:3,bottom:3,right:'auto'}}
+        style={{width:`calc((100% - 6px) / ${notificationBillingOptions.length})`,left:3,top:3,bottom:3,right:'auto'}}
         animate={{x:`${selectedIndex*100}%`}}
         transition={shouldReduceMotion?{duration:0}:{duration:0.22,ease:'easeOut'}}/>
       {notificationBillingOptions.map((option, index) => <button
@@ -45,6 +61,7 @@ export function BillingSegmentedControl({
         ref={node => { tabRefs.current[index] = node; }}
         id={`${id}-${option.id}`}
         type="button"
+        disabled={!option.enabled}
         role="tab"
         aria-selected={value === option.id}
         aria-controls={`${id}-price`}

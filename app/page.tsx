@@ -1,13 +1,6 @@
-import { Landing } from '@/components/Landing';
-import { Hero } from '@/components/Hero';
-import { HeroPurchaseCard } from '@/components/HeroPurchaseCard';
+import { Homepage } from '@/components/Homepage';
+import { getPublishedSiteConfig } from '@/lib/site-settings';
 
-export default function Home() {
-  return (
-    <Landing>
-      <Hero>
-        <HeroPurchaseCard />
-      </Hero>
-    </Landing>
-  );
+export default async function Home() {
+  return <Homepage config={await getPublishedSiteConfig()} />;
 }
