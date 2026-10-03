@@ -99,8 +99,8 @@ export function HeroPurchaseCard() {
     <div className="checkout-card-content">
       <div className="window-label"><span>YOUR NEXT SEMESTER, SORTED.</span><span className="window-dots" aria-hidden>● ● ●</span></div>
       <div className="checkout-product">
-        <Image src="/files/logo.png" alt="Soton Auto-Check" width="64" height="64" sizes="64px" quality={100} loading="eager"/>
-        <div><p className="eyebrow">SOTON AUTO-CHECK</p><h2>{t('让签到简单一点。', 'A simpler class routine.')}</h2></div>
+        <Image src="/files/logo.png" alt="Auto-Check" width="64" height="64" sizes="64px" quality={100} loading="eager"/>
+        <div><p className="eyebrow">AUTO-CHECK</p><h2>{t('让签到简单一点。', 'A simpler class routine.')}</h2></div>
       </div>
       <p className="checkout-subtitle">{t('选择你需要的服务。', 'Choose the service you need.')}</p>
 

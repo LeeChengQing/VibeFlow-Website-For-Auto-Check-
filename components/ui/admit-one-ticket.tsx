@@ -55,7 +55,7 @@ export function AdmitOneTicket({ name, presenter, event, venue, dates, stubText,
     <div className={styles.gloss} aria-hidden="true" />
     <div className={styles.content}>
       <header className={styles.header}><span>{presenter}</span><span className={styles.status}><i />PAID · LOCAL TEST</span></header>
-      <div className={styles.brandRow}><span className={styles.kicker}>SOTON AUTO-CHECK</span><span className={styles.admitLabel}>ADMIT ONE</span></div>
+      <div className={styles.brandRow}><span className={styles.kicker}>AUTO-CHECK</span><span className={styles.admitLabel}>ADMIT ONE</span></div>
       <h2 className={styles.name}>{lines.map((line, index) => <span key={`${index}-${line}`}>{line}</span>)}</h2>
       <div className={styles.rule} />
       <div className={styles.eventRow}><strong>{event}</strong><span>{venue}</span></div>

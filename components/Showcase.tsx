@@ -10,11 +10,11 @@ export function Showcase(){
   const sectionRef=useRef<HTMLElement>(null);
   const items=[
     {id:'extension',className:'showcase-main',content:<>
-      <div className="bento-card-top"><span className="bento-kicker">SOTON AUTO-CHECK</span><span className="bento-pill">Chrome Extension</span></div>
+      <div className="bento-card-top"><span className="bento-kicker">AUTO-CHECK</span><span className="bento-pill">Chrome Extension</span></div>
       <h3>{t('签到安排，','Your class routine,')}<br/><span className="bento-muted">{t('一次理顺。','all lined up.')}</span></h3>
       <p>{t('导入课表、连接签到入口，确认每周任务。把重复操作交给扩展。','Import your timetable, connect your check-in, and confirm weekly tasks. Let the extension handle the repetition.')}</p>
       <div className="bento-app-preview" aria-label={t('课程任务界面示意','Illustrative course task preview')}>
-        <div className="bento-app-bar"><Image src="/files/logo.png" alt="" width="32" height="32" sizes="32px" quality={100}/><div><strong>Soton Auto-Check</strong><small>{t('每周任务 · 产品示意','Weekly tasks · Preview')}</small></div><span className="bento-status-dot"/></div>
+        <div className="bento-app-bar"><Image src="/files/logo.png" alt="" width="32" height="32" sizes="32px" quality={100}/><div><strong>Auto-Check</strong><small>{t('每周任务 · 产品示意','Weekly tasks · Preview')}</small></div><span className="bento-status-dot"/></div>
         <div className="bento-task"><span>09:00</span><div><strong>Lecture</strong><small>Microsoft Forms</small></div><span className="task-state">{t('已确认','Confirmed')}</span></div>
         <div className="bento-task"><span>14:00</span><div><strong>Tutorial</strong><small>QR / Forms</small></div><span className="task-state muted-state">{t('待确认','Review')}</span></div>
       </div>

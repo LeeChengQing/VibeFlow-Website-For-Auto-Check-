@@ -85,7 +85,7 @@ export function ReceiptTicket({ order, includedItems, error, onOpenSupport, onRe
       {expanded && <div className={styles.dialogHead}><h2 id="ticket-dialog-title">{t('View Your Ticket', 'View Your Ticket')}</h2><button ref={closeRef} type="button" className={styles.closeButton} aria-label={t('关闭票券','Close ticket')} onClick={() => setExpanded(false)}>×</button></div>}
       <div ref={ticketRef} className={`${styles.ticketFrame} receipt-ticket receipt-stage`}>
         <div ref={ticketImageRef} className={styles.ticketArtwork} style={{ maxWidth: `${ticketWidth}px` }}>
-          <AdmitOneTicket name={plan.name} presenter="VibeFlow presents" event="Soton Auto-Check" venue={t('本地测试 · 无真实付款', 'LOCAL TEST · NO REAL PAYMENT')} dates={dateLabel} stubText={order.reference} watermark="PAID" width={ticketWidth} shaderEnabled={shaderEnabled} animate={shaderMoving} />
+          <AdmitOneTicket name={plan.name} presenter="VibeFlow presents" event="Auto-Check" venue={t('本地测试 · 无真实付款', 'LOCAL TEST · NO REAL PAYMENT')} dates={dateLabel} stubText={order.reference} watermark="PAID" width={ticketWidth} shaderEnabled={shaderEnabled} animate={shaderMoving} />
         </div>
         <span className={styles.srOnly}>{finalAmount}</span>
       </div>
