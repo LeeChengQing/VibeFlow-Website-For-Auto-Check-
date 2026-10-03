@@ -167,7 +167,6 @@ export function HeroPurchaseCard() {
       </div>
 
       <BuyButton plan={checkoutPlan}>{cta}</BuyButton>
-      <div id="hero-ambient-toggle-slot" className="ambient-toggle-row" />
     </div>
   </div>;
 }
