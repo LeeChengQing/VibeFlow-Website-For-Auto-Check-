@@ -247,6 +247,10 @@ html:has(.guide-dialog[open]){overflow:hidden}
 }
 @media(max-width:767px){
   .mini-notification-details{padding-left:12px}
+  .mini-notification-choice{display:grid;grid-template-columns:16px minmax(0,1fr);column-gap:10px;row-gap:4px;align-items:start}
+  .mini-notification-choice>.selection-radio{grid-row:1 / span 2}
+  .mini-notification-choice>span:nth-child(2){min-width:0}
+  .mini-notification-choice .mini-from-price{grid-column:2;grid-row:2;justify-self:start;margin:0;white-space:normal;text-align:left;line-height:1.4}
   .mini-bundle-price>span{font-size:6px;padding:3px 5px}
   .mini-bundle-promo{align-items:flex-start;flex-direction:column;gap:6px}
   .mini-bundle-countdown{font-size:10px}
