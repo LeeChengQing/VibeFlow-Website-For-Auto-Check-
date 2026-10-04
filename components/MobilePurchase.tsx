@@ -1,6 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from 'react';
+import { useReducedMotion } from 'framer-motion';
+import * as motion from 'framer-motion/m';
 import type { PlanCode } from '@/lib/plans';
 import { notificationPlanCodes } from '@/lib/plans';
 import { packagePrice, purchaseAllowed } from '@/lib/site-config';
@@ -31,6 +33,7 @@ export function MobilePurchase() {
   const pricing = useMobilePricing();
   const active = useOfferActive();
   const { billingPlan, setBillingPlan } = useNotificationBilling();
+  const shouldReduceMotion = useReducedMotion();
   const [selected, setSelected] = useState<Product>('bundle');
   const [viewPlans, setViewPlans] = useState(false);
   const [sticky, setSticky] = useState(false);
@@ -107,7 +110,23 @@ export function MobilePurchase() {
   return <section className="mobile-only mobile-purchase shell" aria-labelledby="mobile-hero-title">
     <div className="mobile-hero"><p className="eyebrow">{t('新学期，安排好了。', 'YOUR NEXT SEMESTER, SORTED.')}</p><h1 id="mobile-hero-title">{t('让签到简单一点。', 'A simpler class routine.')}</h1><p>{t('选择你需要的服务。', 'Choose the service you need.')}</p></div>
     <div className="mobile-plan-selector" role="radiogroup" aria-label={t('选择产品', 'Choose a product')}>
-      {products.map((value, index) => <button type="button" role="radio" key={value} ref={node => { radioRefs.current[index] = node; }} disabled={!enabled(value)} aria-checked={product === value} tabIndex={product === value ? 0 : -1} onClick={() => select(value)} onKeyDown={event => keyDown(event, index)}>{label(value)}{product === value && <span aria-hidden>✓</span>}</button>)}
+      {products.map((value, index) => <motion.button
+        type="button" role="radio" key={value} ref={node => { radioRefs.current[index] = node; }}
+        disabled={!enabled(value)} aria-checked={product === value}
+        tabIndex={product === value ? 0 : -1}
+        onClick={() => select(value)} onKeyDown={event => keyDown(event, index)}
+        whileTap={shouldReduceMotion ? undefined : { scale: 0.92 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      >
+        {product === value && <motion.div
+          layoutId="active-package-tab"
+          className="absolute inset-0 rounded-xl border border-cyan-200/50 bg-cyan-300/10"
+          aria-hidden="true"
+          transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 25 }}
+        />}
+        <span className="relative z-10">{label(value)}</span>
+        {product === value && <span className="relative z-10" aria-hidden="true">✓</span>}
+      </motion.button>)}
     </div>
     <div className="mobile-purchase-panel">
       <div className="mobile-panel-heading"><h2>{product === 'bundle' ? t('完整体验包', 'Complete Bundle') : product === 'extension' ? t('浏览器扩展', 'Browser Extension') : t('手机通知服务', 'Mobile Notifications')}</h2>{product === 'bundle' && <span className="mobile-value-badge">{t('超值之选', 'BEST VALUE')}</span>}</div>
