@@ -16,6 +16,10 @@ Register a publicly reachable HTTPS `/api/hitpay/webhook` URL as a JSON event we
 
 ## Checkout
 
+Once the shared purchase modal receives and validates the hosted checkout URL, it replaces the email form with a faded-in secure loading state and a three-second countdown. The modal remains locked against duplicate submissions and dismissal during handoff. Its countdown interval is cleared on completion or unmount, and browser Back restoration resets the handoff state.
+
+The payment request includes `redirect_url` pointing to `/success` on the checkout request's origin. HitPay appends its payment request UUID as `reference`. The return page validates this UUID and reads only the saved order status and webhook confirmation timestamp through the existing server-only commerce client. It never treats the query-string `status` as proof of payment. During its five-second return-to-home countdown, pending confirmation is refreshed once per second; both intervals are cleaned up. Confirmed issuance shows the animated checkmark, while pending or unavailable confirmation shows accurate status copy. The current integration does not send license emails or track email delivery, so the page does not claim an email was sent.
+
 ```json
 {"buyer_email":"buyer@example.com","plan":"bundle"}
 ```

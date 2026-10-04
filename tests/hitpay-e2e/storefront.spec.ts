@@ -22,7 +22,7 @@ test(`bundle checkout collects email and navigates to ${host}`, async ({ page })
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Delivery email', { exact: true }).fill(' Buyer@Example.com ');
   await dialog.getByRole('button', { name: 'Continue to HitPay' }).click();
-  await expect(page).toHaveURL(url);
+  await expect(page).toHaveURL(url, { timeout: 6000 });
   expect(requests).toEqual([{ buyer_email: 'buyer@example.com', plan: 'bundle' }]);
   expect(legacyCalls).toBe(0);
 });
@@ -127,7 +127,7 @@ for (const width of [1440, 402]) {
     await expect(email).toBeFocused();
     await email.fill(' Buyer@Example.com ');
     await dialog.getByRole('button', { name: 'Continue to HitPay' }).click();
-    await expect(page).toHaveURL(url);
+    await expect(page).toHaveURL(url, { timeout: 6000 });
     expect(requests).toEqual([{ buyer_email: 'buyer@example.com', plan: 'extension' }]);
     expect(legacyCalls).toBe(0);
   });

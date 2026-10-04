@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode, type Ref } from 'react';
 import { createPortal } from 'react-dom';
+import { m, useReducedMotion } from 'framer-motion';
+import { LoaderCircle, LockKeyhole } from 'lucide-react';
 import { useLocale } from './LocaleProvider';
 import { useSiteConfig } from './SiteConfigProvider';
 import { purchaseAllowed } from '@/lib/site-config';
@@ -24,6 +26,11 @@ export function BuyButton({
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [hitpayUrl, setHitpayUrl] = useState<string | null>(null);
+  const reducedMotion = useReducedMotion();
+  const redirectAttempted = useRef(false);
   const submitting = useRef(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -39,12 +46,13 @@ export function BuyButton({
     : t('此方案暂不可购买', 'This package is currently unavailable');
 
   useEffect(() => {
-    if (!open || !available) return;
+    if (!open || (!available && !isRedirecting)) return;
 
     const previousOverflow = document.body.style.overflow;
     const previousFocus = returnFocusRef.current;
     document.body.style.overflow = 'hidden';
-    emailInputRef.current?.focus();
+    if (isRedirecting) dialogRef.current?.focus();
+    else emailInputRef.current?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape' && !submitting.current) {
@@ -70,7 +78,47 @@ export function BuyButton({
         if (previousFocus?.isConnected && !document.querySelector('[aria-modal=true], dialog[open]')) previousFocus.focus({ preventScroll: true });
       }));
     };
-  }, [open, available]);
+  }, [open, available, isRedirecting]);
+
+  useEffect(() => {
+    if (!isRedirecting || !hitpayUrl) return;
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const remaining = Math.max(0, 3 - Math.floor((Date.now() - startedAt) / 1000));
+      setRedirectCountdown(remaining);
+      if (remaining === 0) window.clearInterval(interval);
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [isRedirecting, hitpayUrl]);
+
+  useEffect(() => {
+    if (!isRedirecting || redirectCountdown !== 0 || !hitpayUrl || redirectAttempted.current) return;
+    redirectAttempted.current = true;
+    try {
+      window.location.href = hitpayUrl;
+    } catch {
+      setIsRedirecting(false);
+      setHitpayUrl(null);
+      submitting.current = false;
+      setBusy(false);
+      setError(t('暂时无法打开付款页面，请稍后重试。', 'Could not open checkout. Please try again later.'));
+    }
+  }, [isRedirecting, redirectCountdown, hitpayUrl, t]);
+
+  useEffect(() => {
+    // A browser Back navigation may restore the pre-redirect modal from bfcache.
+    function restore(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+      redirectAttempted.current = false;
+      submitting.current = false;
+      setIsRedirecting(false);
+      setHitpayUrl(null);
+      setRedirectCountdown(3);
+      setBusy(false);
+    }
+    window.addEventListener('pageshow', restore);
+    return () => window.removeEventListener('pageshow', restore);
+  }, []);
 
   function closeModal() {
     if (submitting.current) return;
@@ -112,7 +160,10 @@ export function BuyButton({
         throw new Error('INVALID_CHECKOUT_RESPONSE');
       }
       if (!isHitPaySandboxCheckoutURL(result.url)) throw new Error('INVALID_CHECKOUT_URL');
-      window.location.assign(result.url);
+      redirectAttempted.current = false;
+      setHitpayUrl(result.url);
+      setRedirectCountdown(3);
+      setIsRedirecting(true);
       redirecting = true;
     } catch {
       setError(checkoutError(undefined));
@@ -126,7 +177,7 @@ export function BuyButton({
   }
 
   return (
-    <div className="buy-action" data-checkout-open={open && available ? '' : undefined}>
+    <div className="buy-action" data-checkout-open={open && (available || isRedirecting) ? '' : undefined}>
       <button
         ref={triggerRef} type="button" className={className} disabled={busy || !available}
         onClick={event => {
@@ -138,7 +189,7 @@ export function BuyButton({
         {children}<span aria-hidden="true">↗</span>
       </button>
 
-      {open && available && createPortal(
+      {open && (available || isRedirecting) && createPortal(
         <div
           className="checkout-modal fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
           onClick={event => { if (event.target === event.currentTarget) closeModal(); }}
@@ -147,7 +198,25 @@ export function BuyButton({
             ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={dialogTitleId}
             className="checkout-modal-panel w-full max-w-md rounded-2xl border border-white/15 bg-[#111317] p-6 text-white shadow-2xl sm:p-8"
           >
-            <form id={formId} className="form" onSubmit={buy} aria-busy={busy}>
+            {isRedirecting ? (
+              <m.div
+                initial={{ opacity: reducedMotion ? 1 : 0 }} animate={{ opacity: 1 }}
+                transition={{ duration: reducedMotion ? 0 : 0.2 }}
+                className="flex min-h-64 flex-col items-center justify-center gap-5 py-6 text-center"
+              >
+                <div className="relative flex size-20 items-center justify-center rounded-full border border-white/10 bg-white/5" aria-hidden="true">
+                  <LoaderCircle className="absolute size-14 animate-spin text-white/70 motion-reduce:animate-none" strokeWidth={1.5} />
+                  <LockKeyhole className="size-5 text-white" strokeWidth={1.5} />
+                </div>
+                <h2 id={dialogTitleId} className="text-xl font-semibold tracking-tight" role="status">
+                  {t('正在安全跳转至付款页面…', 'Securely directing to payment...')}
+                </h2>
+                <p className="text-sm tabular-nums text-white/60" aria-live="polite" aria-atomic="true">
+                  {t(`${redirectCountdown} 秒后跳转`, `Redirecting in ${redirectCountdown}s`)}
+                </p>
+                <p className="text-xs text-white/40">{t('由 HitPay 提供安全付款', 'Secure checkout by HitPay')}</p>
+              </m.div>
+            ) : <form id={formId} className="form" onSubmit={buy} aria-busy={busy}>
               <h2 id={dialogTitleId} className="text-xl font-semibold">
                 {t('完成购买', 'Complete your purchase')}
               </h2>
@@ -170,7 +239,7 @@ export function BuyButton({
               <button type="button" className="button secondary" disabled={busy} onClick={closeModal}>
                 {t('取消', 'Cancel')}
               </button>
-            </form>
+            </form>}
           </div>
         </div>,
         document.body,

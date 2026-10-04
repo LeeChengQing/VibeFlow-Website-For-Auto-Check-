@@ -62,6 +62,7 @@ export async function POST(request: Request) {
     const requestPayload = {
       email, currency: 'MYR', amount: Number(amount),
       reference_number: reference, purpose: `Auto-Check ${plan}`,
+      redirect_url: new URL('/success', request.url).href,
       allow_repeated_payments: 'false', send_email: 'false', send_sms: 'false',
     };
     const requestBody = JSON.stringify(requestPayload);
