@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { createAdminSession, deleteAdminSession, requireAdminSession, verifyAdminPassword } from '@/lib/admin-auth';
 import { generateActivationCode, hashActivationCode } from '@/lib/admin-keys';
 import { isKeyPlan, type ActionError } from '@/lib/admin-key-options';
-import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { getSupabaseAdmin, type KeyInventoryInsert } from '@/lib/supabase/admin';
 
 export async function loginAction(password: string): Promise<ActionError> {
   try {
@@ -34,9 +34,9 @@ export async function generateKeysAction(plan: string, count: number): Promise<s
     }
     const db = await getSupabaseAdmin();
     const codes = Array.from({ length: count }, generateActivationCode);
-    const rows = codes.map(code => ({ key_hash: hashActivationCode(code), plan_type: plan, status: 'available' as const }));
+    const rows: KeyInventoryInsert[] = codes.map(code => ({ key_hash: hashActivationCode(code), plan_type: plan, status: 'available' }));
     // A single multi-row INSERT is atomic. Do not insert per code or return DB records.
-    const { error } = await db.from('activation_keys').insert(rows);
+    const { error } = await db.from('key_inventory').insert(rows);
     if (error) return { error: 'Could not create the batch. Please try again.' };
     revalidatePath('/admin');
     return codes;

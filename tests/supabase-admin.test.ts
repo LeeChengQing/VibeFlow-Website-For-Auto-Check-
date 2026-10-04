@@ -29,11 +29,11 @@ function setup(authorized = true) {
 test('service-role data requests are authorized and uncached', async () => {
   const { admin, requests } = setup();
   const db = await admin.getSupabaseAdmin();
-  const result = await db.from('activation_keys').select('id');
+  const result = await db.from('key_inventory').select('id');
   assert.equal(result.error, null);
   assert.deepEqual(result.data, []);
   assert.equal(requests.length, 1);
-  assert.match(requests[0].url, /^https:\/\/project.supabase.co\/rest\/v1\/activation_keys/);
+  assert.match(requests[0].url, /^https:\/\/project.supabase.co\/rest\/v1\/key_inventory/);
   assert.equal(requests[0].headers.get('apikey'), 'test-service-role-key');
   assert.equal(requests[0].headers.get('authorization'), 'Bearer test-service-role-key');
   assert.equal(requests[0].cache, 'no-store');

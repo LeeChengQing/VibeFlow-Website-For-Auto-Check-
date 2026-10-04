@@ -152,11 +152,21 @@ test('local orders/support actions and key revocation share the authenticated wo
   expect((await (await request.get(`/api/support/${ticketToken}`)).json()).status).toBe('open');
   await request.post('http://127.0.0.1:54330/__reset');
   await section(page, 'Key Inventory');
+  const licensesBefore = await (await request.get('http://127.0.0.1:54330/__licenses')).json();
   await page.getByRole('button', { name: 'Revoke', exact: true }).first().click();
   await page.getByRole('button', { name: 'Confirm revocation', exact: true }).click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   const rows = await (await request.get('http://127.0.0.1:54330/__rows')).json();
-  expect(rows.filter((row: {status:string}) => row.status === 'revoked')).toHaveLength(3);
+  const licensesAfter = await (await request.get('http://127.0.0.1:54330/__licenses')).json();
+  expect(licensesAfter.filter((row: {status:string}) => row.status === 'revoked')).toHaveLength(3);
+  expect(rows.filter((row: {status:string}) => row.status === 'available')).toHaveLength(24);
+  expect(rows.filter((row: {status:string}) => row.status === 'assigned')).toHaveLength(8);
+  const changed = licensesAfter.find((row: { id: string; status: string }) =>
+    licensesBefore.find((before: { id: string; status: string }) => before.id === row.id)?.status !== row.status);
+  expect(changed).toBeTruthy();
+  expect(changed.buyer_email).toBe('buyer@example.com');
+  expect(changed.inventory_id).toBeTruthy();
+  await expect(page.getByRole('main').getByTestId('redeemed-count')).toHaveText('8');
 });
 
 test('settings outages retain one-time codes and stale sessions cannot overwrite another draft', async ({ page, context, request }) => {

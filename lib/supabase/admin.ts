@@ -4,36 +4,92 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAdminSession } from '@/lib/admin-auth';
 
 export type ActivationKeyPlan = 'bundle' | 'semester' | 'yearly' | 'internal_check';
-export type ActivationKeyStatus = 'available' | 'redeemed' | 'revoked';
+export type KeyInventoryStatus = 'available' | 'assigned';
+export type IssuedLicenseStatus = 'active' | 'revoked';
+export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded';
 
-export type ActivationKeyRow = {
+export type KeyInventoryRow = {
   id: string;
   key_hash: string;
   plan_type: ActivationKeyPlan;
-  status: ActivationKeyStatus;
-  buyer_email: string | null;
-  device_id: string | null;
-  redeemed_at: string | null;
-  created_at: string;
+  status: KeyInventoryStatus;
 };
 
-type ActivationKeyInsert = {
-  key_hash: string;
+export type IssuedLicenseRow = {
+  id: string;
+  order_id: string;
+  inventory_id: string;
+  buyer_email: string;
   plan_type: ActivationKeyPlan;
-} & Partial<Omit<ActivationKeyRow, 'key_hash' | 'plan_type'>>;
+  device_id: string | null;
+  status: IssuedLicenseStatus;
+  activated_at: string | null;
+};
 
-type AdminDatabase = {
+export type OrderRow = {
+  id: string;
+  reference: string;
+  buyer_email: string;
+  plan: ActivationKeyPlan;
+  amount_minor: number;
+  currency: string;
+  status: OrderStatus;
+  payment_provider: string;
+  provider_payment_id: string | null;
+  paid_at: string | null;
+  provider_request_id: string | null;
+  payment_confirmed_at: string | null;
+  fulfillment_error: 'INVENTORY_EXHAUSTED' | null;
+};
+
+export type KeyInventoryInsert = Pick<KeyInventoryRow, 'key_hash' | 'plan_type'> &
+  Partial<Pick<KeyInventoryRow, 'id' | 'status'>>;
+export type IssuedLicenseInsert = Pick<IssuedLicenseRow, 'order_id' | 'inventory_id' | 'buyer_email' | 'plan_type'> &
+  Partial<Pick<IssuedLicenseRow, 'id' | 'device_id' | 'status' | 'activated_at'>>;
+export type OrderInsert = Omit<OrderRow, 'id' | 'status' | 'provider_payment_id' | 'paid_at' | 'provider_request_id' | 'payment_confirmed_at' | 'fulfillment_error'> &
+  Partial<Pick<OrderRow, 'id' | 'status' | 'provider_payment_id' | 'paid_at' | 'provider_request_id' | 'payment_confirmed_at' | 'fulfillment_error'>>;
+
+export type AdminDatabase = {
   public: {
     Tables: {
-      activation_keys: {
-        Row: ActivationKeyRow;
-        Insert: ActivationKeyInsert;
-        Update: Partial<ActivationKeyRow>;
+      key_inventory: {
+        Row: KeyInventoryRow;
+        Insert: KeyInventoryInsert;
+        Update: Partial<KeyInventoryRow>;
+        Relationships: [];
+      };
+      issued_licenses: {
+        Row: IssuedLicenseRow;
+        Insert: IssuedLicenseInsert;
+        Update: Partial<IssuedLicenseRow>;
+        Relationships: [
+          {
+            foreignKeyName: 'issued_licenses_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: true;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'issued_licenses_inventory_id_fkey';
+            columns: ['inventory_id'];
+            isOneToOne: true;
+            referencedRelation: 'key_inventory';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      orders: {
+        Row: OrderRow;
+        Insert: OrderInsert;
+        Update: Partial<OrderRow>;
         Relationships: [];
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      assign_available_key: { Args: { p_order_id: string }; Returns: string };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

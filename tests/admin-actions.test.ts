@@ -23,7 +23,7 @@ function setup(options: { authorized?: boolean; dbError?: boolean; passwordValid
       requireAdminSession: async () => { if (options.authorized === false) throw new Error('UNAUTHORIZED'); },
     },
     '@/lib/supabase/admin': { getSupabaseAdmin: async () => ({ from: (table: string) => {
-      assert.equal(table, 'activation_keys');
+      assert.equal(table, 'key_inventory');
       return { insert: async (rows: Record<string, unknown>[]) => {
         batches.push(rows);
         return { error: options.dbError ? { message: 'database-private-detail' } : null };
@@ -104,8 +104,10 @@ test('multi-row insertion is atomic when one key violates a constraint', async (
     await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');
     const migration = readdirSync('supabase/migrations').find(name => name.endsWith('_activation_keys.sql'))!;
     await db.exec(readFileSync(`supabase/migrations/${migration}`, 'utf8'));
-    await assert.rejects(db.query(`insert into public.activation_keys (key_hash, plan_type)
+    const commerce = readdirSync('supabase/migrations').find(name => name.endsWith('_commerce_and_inventory.sql'))!;
+    await db.exec(readFileSync(`supabase/migrations/${commerce}`, 'utf8'));
+    await assert.rejects(db.query(`insert into public.key_inventory (key_hash, plan_type)
       values ($1, 'bundle'), ($2, 'bundle')`, ['a'.repeat(64), 'invalid']), /check constraint/);
-    assert.equal((await db.query('select * from public.activation_keys')).rows.length, 0);
+    assert.equal((await db.query('select * from public.key_inventory')).rows.length, 0);
   } finally { await db.close(); }
 });

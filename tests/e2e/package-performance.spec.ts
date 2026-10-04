@@ -82,19 +82,17 @@ test('limited hardware never downloads the support video', async ({ page }) => {
   await expect(page.locator('.orb-static')).toBeVisible();
 });
 
-test('checkout and order navigation retain the document and correct purchase amount', async ({ page, baseURL }) => {
-  test.skip(!!baseURL?.endsWith(':3002'), 'Local checkout mutations are intentionally locked in production');
+test('storefront email entry retains the document and correct purchase amount before hosted checkout', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => Object.assign(window, { navigationMarker: 'same-document' }));
   const hero = page.locator('.hero-checkout');
-  await hero.getByRole('radio', { name: /Browser extension/ }).click();
-  await hero.getByRole('button', { name: 'Buy browser extension' }).click();
-  await expect(page).toHaveURL(/\/checkout\//);
-  await expect(page.locator('.order-total strong')).toHaveText('RM 24.99');
+  await hero.getByRole('button', { name: 'Get complete bundle' }).click();
+  await expect(hero.getByLabel('Delivery email', { exact: true })).toBeVisible();
+  await expect(hero).toContainText('RM 30.00');
   expect(await page.evaluate(() => (window as unknown as { navigationMarker?: string }).navigationMarker)).toBe('same-document');
-  await page.getByLabel('Delivery email', { exact: true }).fill('performance@example.com');
-  await page.getByRole('button', { name: 'Simulate successful payment' }).click();
-  await expect(page).toHaveURL(/\/order\//);
+  await hero.getByLabel('Delivery email', { exact: true }).fill('performance@example.com');
+  await hero.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(hero.getByRole('button', { name: 'Get complete bundle' })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { navigationMarker?: string }).navigationMarker)).toBe('same-document');
 });
 

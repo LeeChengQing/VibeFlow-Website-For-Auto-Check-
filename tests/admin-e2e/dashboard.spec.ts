@@ -22,7 +22,10 @@ test('login, filtered inventory, one-time copy/CSV, closure and logout', async (
   expect(Date.now() - started).toBeGreaterThanOrEqual(1950);
   await login(page);
   await expect(page.getByRole('main').getByTestId('total-count')).toHaveText('32');
+  await expect(page.getByRole('main').getByTestId('available-count')).toHaveText('24');
+  await expect(page.getByRole('main').getByTestId('redeemed-count')).toHaveText('8');
   await expect(page.locator('tbody:visible tr')).toHaveCount(25);
+  await expect(page.locator('tbody:visible tr').filter({ hasText: 'Available' }).getByRole('button', { name: 'Revoke', exact: true })).toHaveCount(0);
   await page.getByRole('heading', { name: 'Key inventory', exact: true }).click();
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   await page.screenshot({ path: '.local/admin-dashboard-desktop.png', fullPage: true });
@@ -30,10 +33,12 @@ test('login, filtered inventory, one-time copy/CSV, closure and logout', async (
   await expect(page.locator('tbody:visible tr')).toHaveCount(7);
   await expect(page.getByRole('navigation', { name: 'Key inventory pagination' })).toContainText('Previous');
   await page.getByLabel('Filter by plan').selectOption('yearly');
-  await page.getByLabel('Filter by status').selectOption('redeemed');
+  await page.getByLabel('Filter by status').selectOption('assigned');
   await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect(page).toHaveURL(/plan=yearly.*status=redeemed/);
-  await expect(page.locator('tbody:visible tr')).toHaveCount(1);
+  await expect(page).toHaveURL(/plan=yearly.*status=assigned/);
+  await expect(page.locator('tbody:visible tr')).toHaveCount(2);
+  await expect(page.locator('tbody:visible tr').filter({ hasText: 'buyer@example.com' })).toHaveCount(2);
+  await expect(page.locator('tbody:visible tr').filter({ hasText: 'Revoked' })).toHaveCount(1);
   await expect(page.getByRole('main').getByTestId('total-count')).toHaveText('32');
   await page.getByLabel('Provisioning plan').selectOption('semester');
   await page.getByLabel('Number of keys').fill('3');

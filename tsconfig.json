@@ -39,7 +39,9 @@
     ".next-admin-e2e/types/**/*.ts",
     ".next-admin-e2e/dev/types/**/*.ts",
     ".next-admin-test/types/**/*.ts",
-    ".next-admin-test/dev/types/**/*.ts"
+    ".next-admin-test/dev/types/**/*.ts",
+    ".next-hitpay-test/types/**/*.ts",
+    ".next-hitpay-test/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

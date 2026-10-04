@@ -3,6 +3,7 @@ node_modules/
 .next-e2e/
 .next-admin-e2e/
 .next-admin-test/
+.next-hitpay-test/
 .env*
 !.env.example
 .local/

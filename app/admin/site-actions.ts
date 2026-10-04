@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { validateSiteConfig, type SiteActionResult } from '@/lib/site-config';
-import { mutateSiteSettings, getSiteManagementData, getSiteAdminDatabase, isLocalSiteManagement, recordSiteActivity } from '@/lib/site-settings';
+import { mutateSiteSettings, getSiteManagementData, getSiteAdminDatabase, recordSiteActivity } from '@/lib/site-settings';
 import { storeSiteAsset, validateConfigAssets, prepareSignedSiteUpload, completeSignedSiteUpload } from '@/lib/site-assets';
 
 function safeError(error: unknown): SiteActionResult {
@@ -51,19 +51,22 @@ export async function uploadSiteAssetAction(form: FormData): Promise<SiteActionR
     return { ok: true, assetId: asset.id, src: kind === 'guide' ? `/api/site/assets/${asset.id}` : undefined };
   } catch (error) { return safeError(error); }
 }
-export async function revokeKeyAction(id: string): Promise<SiteActionResult> {
+export async function revokeKeyAction(id: string): Promise<SiteActionResult & { warning?: string }> {
   try {
     await requireAdminSession();
-    if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id)) throw new Error('INVALID_SITE_CONFIG');
+    if (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) throw new Error('INVALID_SITE_CONFIG');
     const db = await getSiteAdminDatabase();
-    const { error } = await db.rpc('revoke_activation_key', { p_key_id: id });
-    if (error) return { error: 'Could not revoke this key. It may already be revoked.' };
-    // Production RPC writes its audit atomically; the local fixture uses the local activity store.
-    if (await isLocalSiteManagement()) {
-      try { await recordSiteActivity('revoke_key', `Revoked activation key ${id}`); } catch { /* Revocation already succeeded; refreshing must not repeat it. */ }
-    }
+    // Conditional UPDATE prevents duplicate revocation and never releases stock.
+    const { data, error } = await db.from('issued_licenses').update({ status: 'revoked' })
+      .eq('id', id).eq('status', 'active').select('id').maybeSingle();
+    if (error || !data) return { error: 'Could not revoke this license. It may already be revoked.' };
+    let warning: string | undefined;
+    // This schema has no revocation RPC; activity is a separate write. Report an
+    // audit failure without asking the operator to repeat an already committed update.
+    try { await recordSiteActivity('revoke_license', `Revoked issued license ${id}`); }
+    catch { warning = 'License revoked. Activity logging is temporarily unavailable.'; }
     revalidatePath('/admin');
-    return { ok: true };
+    return warning ? { ok: true, warning } : { ok: true };
   } catch (error) { return safeError(error); }
 }
 

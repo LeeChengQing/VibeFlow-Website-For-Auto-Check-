@@ -96,13 +96,14 @@ test('server ignores tampered prices and protects private/admin routes',async({r
   expect((await request.post('/api/checkout',{headers:{Origin:'http://127.0.0.1:3001'},data:{plan:'combo'}})).status()).toBe(400);
 });
 
-test('complete extension checkout, create ticket, admin reply, resend and refund',async({page})=>{
+test('local preview checkout, create ticket, admin reply, resend and refund',async({page,request})=>{
   await page.addInitScript(()=>localStorage.setItem('vf-locale','en'));
   await page.goto('/');
-  await page.locator('#pricing').getByRole('button',{name:'Get the extension'}).click();await expect(page).toHaveURL(/\/checkout\//);
+  const created=await request.post('/api/checkout',{headers:{Origin:'http://127.0.0.1:3001'},data:{plan:'extension',locale:'en'}});
+  expect(created.status()).toBe(200);const previewOrder=await created.json();await page.goto(previewOrder.url);
   await page.getByLabel('Delivery email', {exact:true}).fill('browser-test@example.com');await page.getByRole('button',{name:'Simulate successful payment'}).click();
   await expect(page).toHaveURL(/\/order\//);await expect(page.getByRole('heading',{name:'Simulated payment complete'})).toBeVisible();
-  const orderUrl=page.url();const reference=await page.getByTestId('ticket-reference').innerText();
+  const orderUrl=page.url();const reference=previewOrder.reference;
   await page.getByRole('link',{name:/^Order support/}).click();await page.getByLabel('Subject',{exact:true}).fill('Browser test setup question');await page.getByLabel('Message',{exact:true}).fill('Please help me with the setup guide.');await page.getByRole('button',{name:'Create support ticket'}).click();
   await expect(page).toHaveURL(/\/support\/[a-f0-9]+/);await expect(page.getByRole('heading',{name:'Browser test setup question'})).toBeVisible();const ticketUrl=page.url();
   await page.goto('/admin/local');await page.getByLabel('Admin password',{exact:true}).fill('wrong-password');await page.getByRole('button',{name:/^Sign in/}).click();await expect(page.locator('form').getByRole('alert')).toHaveText('Incorrect password, or your session has expired.');
@@ -189,30 +190,32 @@ test('receipt entrance sequence can be captured in six frames',async({page,reque
   }
 });
 
-test('mobile notifications use a DEMO key and cancelled checkout never delivers',async({page})=>{
-  await page.goto('/');await page.getByRole('button',{name:'Switch to English'}).click();
-  await page.locator('#pricing').getByRole('button',{name:'Enable mobile notifications · Yearly'}).click();await page.getByLabel('Delivery email',{exact:true}).fill('phone@example.com');await page.getByRole('button',{name:'Simulate successful payment'}).click();await expect(page.locator('.delivery-preview')).toContainText('DEMO-');
-  await page.goto('/');await page.locator('#pricing').getByRole('button',{name:'Get the extension'}).click();await page.getByRole('button',{name:'Simulate cancelled payment'}).click();await expect(page.getByRole('heading',{name:'Payment cancelled'})).toBeVisible();await expect(page.locator('.delivery-preview')).toHaveCount(0);
+test('local preview notifications use a DEMO key and cancelled checkout never delivers',async({page,request})=>{
+  await page.addInitScript(()=>localStorage.setItem('vf-locale','en'));
+  const mobile=await request.post('/api/checkout',{headers:{Origin:'http://127.0.0.1:3001'},data:{plan:'mobile_notification_yearly',locale:'en'}});
+  expect(mobile.status()).toBe(200);await page.goto((await mobile.json()).url);await page.getByLabel('Delivery email',{exact:true}).fill('phone@example.com');await page.getByRole('button',{name:'Simulate successful payment'}).click();await expect(page.locator('.delivery-preview')).toContainText('DEMO-');
+  const extension=await request.post('/api/checkout',{headers:{Origin:'http://127.0.0.1:3001'},data:{plan:'extension',locale:'en'}});
+  expect(extension.status()).toBe(200);await page.goto((await extension.json()).url);await page.getByRole('button',{name:'Simulate cancelled payment'}).click();await expect(page.getByRole('heading',{name:'Payment cancelled'})).toBeVisible();await expect(page.locator('.delivery-preview')).toHaveCount(0);
 });
 
 test('hero recommends the complete bundle while keeping notification plans optional and keyboard-accessible',async({page})=>{
-  await page.goto('/');await page.getByRole('button',{name:'Switch to English'}).click();
+  await page.addInitScript(()=>localStorage.setItem('vf-locale','en'));await page.goto('/');
   const hero=page.locator('.hero-checkout');await expect(hero.getByRole('radio',{name:/Complete experience bundle/})).toHaveAttribute('aria-checked','true');
   await expect(hero).toContainText('RM 30.00');await expect(hero).toContainText('Extension + first semester notifications');
   await expect(hero.locator('.mini-bundle-original-price')).toHaveText('RM 35.00');
   await expect(hero.locator('.mini-bundle-promo')).toContainText('LIMITED-TIME DEAL');await expect(hero.locator('.mini-bundle-promo')).toContainText('Save RM 5.00');
   await expect(hero.locator('.mini-bundle-countdown')).toHaveText(/^\d+d \d{2}h \d{2}m \d{2}s$/);
-  await hero.getByRole('button',{name:'Get complete bundle'}).click();await expect(page).toHaveURL(/\/checkout\//);await expect(page.locator('.order-total strong')).toHaveText('RM 30.00');
+  await hero.getByRole('button',{name:'Get complete bundle'}).click();await expect(hero.getByLabel('Delivery email',{exact:true})).toBeVisible();await expect(hero.getByRole('button',{name:'Continue to HitPay'})).toBeVisible();await expect(hero).toContainText('RM 30.00');
   await page.goto('/');const notificationHero=page.locator('.hero-checkout');await notificationHero.getByRole('radio',{name:/Mobile notifications/}).click();
   const tabs=notificationHero.getByRole('tablist').getByRole('tab');await expect(tabs).toHaveCount(2);
   await expect(tabs.nth(0)).toHaveText('Semester');await expect(tabs.nth(1)).toHaveText('Yearly');
   await expect(notificationHero).not.toContainText('Degree Pass');await expect(notificationHero).not.toContainText('RM 49.99');
   await tabs.nth(1).focus();await page.keyboard.press('ArrowRight');await expect(tabs.nth(0)).toHaveAttribute('aria-selected','true');
   await expect(notificationHero).toContainText('RM 11.99');
-  await notificationHero.getByRole('button',{name:'Enable mobile notifications · Semester'}).click();await expect(page).toHaveURL(/\/checkout\//);await expect(page.locator('.order-total strong')).toHaveText('RM 11.99');
+  await notificationHero.getByRole('button',{name:'Enable mobile notifications · Semester'}).click();await expect(notificationHero.getByLabel('Delivery email',{exact:true})).toBeVisible();await expect(notificationHero).toContainText('RM 11.99');
   await page.goto('/');const extensionHero=page.locator('.hero-checkout');await extensionHero.getByRole('radio',{name:/Browser extension/}).click();
   await expect(extensionHero.getByRole('tablist')).toHaveCount(0);await expect(extensionHero).toContainText('RM 24.99');
-  await extensionHero.getByRole('button',{name:'Buy browser extension'}).click();await expect(page.locator('.order-total strong')).toHaveText('RM 24.99');
+  await expect(extensionHero.getByRole('button',{name:'Buy browser extension'})).toBeDisabled();await expect(extensionHero.locator('.buy-action')).toContainText('Standalone extension checkout is unavailable');
   await page.goto('/');await page.setViewportSize({width:390,height:844});const mobileHero=page.locator('.hero-checkout');await mobileHero.getByRole('radio',{name:/Mobile notifications/}).click();
   const mobileTabs=mobileHero.getByRole('tablist');for(const tab of await mobileTabs.getByRole('tab').all()){const bounds=await tab.boundingBox();expect(bounds?.height).toBeGreaterThanOrEqual(40);expect(await tab.evaluate(el=>getComputedStyle(el).whiteSpace)).toBe('nowrap');}
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

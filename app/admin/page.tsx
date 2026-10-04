@@ -36,5 +36,5 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const [settingsResult, operationsResult] = await Promise.allSettled([getSiteManagementData(), getSiteOperations()]);
   if (settingsResult.status === 'fulfilled') management = settingsResult.value;
   if (operationsResult.status === 'fulfilled') operations = operationsResult.value;
-  return <SiteManagementDashboard management={management} operations={<OperationsPanel data={operations} />} overview={<><OperationsOverview data={operations} />{data && <p className="text-sm text-cyan-200">{data.summary.available} activation keys available · {data.summary.redeemed} redeemed</p>}</>}>{inventory}</SiteManagementDashboard>;
+  return <SiteManagementDashboard management={management} operations={<OperationsPanel data={operations} />} overview={<><OperationsOverview data={operations} />{data && <p className="text-sm text-cyan-200">{data.summary.available} keys available · {data.summary.redeemed} issued licenses</p>}</>}>{inventory}</SiteManagementDashboard>;
 }

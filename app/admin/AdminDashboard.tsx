@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PLAN_LABELS, STATUS_LABELS, KEY_PAGE_SIZE, isKeyPlan, type DashboardData } from '@/lib/admin-key-options';
+import { PLAN_LABELS, STATUS_LABELS, LICENSE_STATUS_LABELS, KEY_PAGE_SIZE, isKeyPlan, type DashboardData } from '@/lib/admin-key-options';
 import { generateKeysAction, logoutAction } from './actions';
 import { revokeKeyAction } from './site-actions';
 import { GeneratedKeysModal, type GeneratedBatch } from './GeneratedKeysModal';
@@ -12,7 +12,8 @@ import { adminSurface, field, glassPanel, primaryButton, secondaryButton } from 
 
 const statusStyles = {
   available: 'border-cyan-300/20 bg-cyan-300/5 text-cyan-200',
-  redeemed: 'border-emerald-300/20 bg-emerald-300/5 text-emerald-200',
+  assigned: 'border-emerald-300/20 bg-emerald-300/5 text-emerald-200',
+  active: 'border-emerald-300/20 bg-emerald-300/5 text-emerald-200',
   revoked: 'border-rose-300/20 bg-rose-300/5 text-rose-200',
 };
 function SignOutButton() {
@@ -31,6 +32,7 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
   const [error, setError] = useState('');
   const [revokeId, setRevokeId] = useState<string | null>(null);
   const [revokeError, setRevokeError] = useState('');
+  const [revokeNotice, setRevokeNotice] = useState('');
   const revokeDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (revokeId) { setRevokeError(''); revokeDialog.current?.showModal(); }
@@ -40,12 +42,13 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
   function revoke() {
     if (!revokeId) return;
     setRevokeError('');
+    setRevokeNotice('');
     startTransition(async () => {
       try {
         const result = await revokeKeyAction(revokeId);
         if ('error' in result) setRevokeError(result.error);
-        else { setRevokeId(null); router.refresh(); }
-      } catch { setRevokeError('The request was interrupted. Refresh inventory to check the key status before retrying.'); }
+        else { setRevokeNotice(result.warning ?? ''); setRevokeId(null); router.refresh(); }
+      } catch { setRevokeError('The request was interrupted. Refresh inventory to check the license status before retrying.'); }
     });
   }
 
@@ -83,6 +86,7 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
         {!embedded && <form action={logoutAction}><SignOutButton /></form>}
       </div>
     </header>
+    {revokeNotice && <p role="status" className="mb-5 text-sm text-amber-200">{revokeNotice}</p>}
 
     {!data ? <div className={`${glassPanel} p-7`}>
       <p role="alert" className="text-sm text-amber-200">Inventory is unavailable. Check the database configuration or try again shortly.</p>
@@ -90,8 +94,8 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
     </div> : <>
       <div className="relative grid gap-4 sm:grid-cols-3">
         {[['Total keys', data.summary.total, 'ALL PLANS', 'total-count'],
-          ['Available', data.summary.available, 'READY TO ACTIVATE', 'available-count'],
-          ['Redeemed', data.summary.redeemed, 'ACCESS ACTIVATED', 'redeemed-count']].map(([label, value, caption, testId]) =>
+          ['Available', data.summary.available, 'READY TO ASSIGN', 'available-count'],
+          ['Redeemed', data.summary.redeemed, 'ISSUED LICENSES', 'redeemed-count']].map(([label, value, caption, testId]) =>
           <section key={label} className={`${glassPanel} p-6`}>
             <h2 className="text-sm font-medium text-white/70">{label}</h2>
             <p data-testid={testId} className={`mt-4! font-mono text-4xl tabular-nums tracking-tight ${label === 'Available' ? 'text-cyan-200' : 'text-white'}`}>{value.toLocaleString('en-GB')}</p>
@@ -129,7 +133,7 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
 
       <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.015]">
         <div className="flex flex-wrap items-center justify-between gap-5 border-b border-white/10 p-5 lg:p-6">
-          <div><h2 className="text-lg font-semibold">Activation ledger</h2><p className="mt-1! text-xs text-white/50">{data.matchingCount.toLocaleString('en-GB')} matching keys · newest first</p></div>
+          <div><h2 className="text-lg font-semibold">Activation ledger</h2><p className="mt-1! text-xs text-white/50">{data.matchingCount.toLocaleString('en-GB')} matching keys</p></div>
           <form action="/admin" method="get" className="flex w-full flex-wrap items-end gap-3 lg:w-auto">
             <div className="min-w-32 flex-1"><label htmlFor="filter-plan" className="mb-2 block text-xs text-white/70">Filter by plan</label>
               <select key={`plan:${data.plan}`} id="filter-plan" name="plan" defaultValue={data.plan} className={field}>
@@ -146,18 +150,18 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
           <table className="w-full min-w-[1000px] border-collapse text-left text-xs">
             <caption className="sr-only">Activation keys identified by hash prefix; all timestamps in Malaysia time.</caption>
             <thead className="bg-white/[0.025] font-mono text-[10px] uppercase tracking-wider text-white/50">
-              <tr>{['Hash identifier', 'Plan', 'Status', 'Buyer email', 'Device ID', 'Created · MYT', 'Redeemed · MYT', 'Action'].map(label => <th key={label} scope="col" className="px-5 py-4 font-medium">{label}</th>)}</tr>
+              <tr>{['Hash identifier', 'Plan', 'Inventory status', 'License status', 'Buyer email', 'Device ID', 'Activated · MYT', 'Action'].map(label => <th key={label} scope="col" className="px-5 py-4 font-medium">{label}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {data.keys.map(key => <tr key={key.id} className="hover:bg-white/[0.025]">
                 <td className="whitespace-nowrap px-5 py-5 font-mono text-white/70">{key.hashPrefix}…</td>
                 <td className="px-5 py-5"><span className="whitespace-nowrap rounded-md border border-white/10 bg-white/5 px-2 py-1 text-white/70">{PLAN_LABELS[key.plan_type]}</span></td>
                 <td className="px-5 py-5"><span className={`whitespace-nowrap rounded-md border px-2 py-1 ${statusStyles[key.status]}`}>{STATUS_LABELS[key.status]}</span></td>
+                <td className="px-5 py-5">{key.license_status ? <span className={`whitespace-nowrap rounded-md border px-2 py-1 ${statusStyles[key.license_status]}`}>{LICENSE_STATUS_LABELS[key.license_status]}</span> : '—'}</td>
                 <td className="max-w-56 break-all px-5 py-5 text-white/70">{key.buyer_email ?? '—'}</td>
                 <td className="max-w-40 break-all px-5 py-5 font-mono text-white/50">{key.device_id ?? '—'}</td>
-                <td className="whitespace-nowrap px-5 py-5 text-white/70">{date(key.created_at)}</td>
-                <td className="whitespace-nowrap px-5 py-5 text-white/50">{date(key.redeemed_at)}</td>
-                <td className="px-5 py-5">{key.status !== 'revoked' && <button disabled={pending} onClick={() => setRevokeId(key.id)} className="text-rose-200 hover:text-rose-100">Revoke</button>}</td>
+                <td className="whitespace-nowrap px-5 py-5 text-white/50">{date(key.activated_at)}</td>
+                <td className="px-5 py-5">{key.license_id && key.license_status === 'active' && <button disabled={pending} onClick={() => setRevokeId(key.license_id)} className="text-rose-200 hover:text-rose-100">Revoke</button>}</td>
               </tr>)}
               {data.keys.length === 0 && <tr><td colSpan={8} className="px-6 py-16 text-center text-white/70">No keys match these filters. Choose another plan or status.</td></tr>}
             </tbody>
@@ -175,7 +179,7 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
     </>}
     <GeneratedKeysModal batch={batch} onDiscard={() => setBatch(null)} />
     <dialog ref={revokeDialog} aria-labelledby="revoke-title" onClose={() => setRevokeId(null)} onCancel={event => { if (pending) event.preventDefault(); }} className="fixed inset-0 m-auto w-[calc(100%_-_2rem)] max-w-md rounded-2xl border border-white/15 bg-zinc-950 p-7 text-white backdrop:bg-black/80 backdrop:backdrop-blur-sm">
-      {revokeId && <><h2 id="revoke-title" className="text-xl font-semibold">Revoke this activation key?</h2><p className="mt-3! text-sm leading-6 text-white/70">This key will no longer be available for activation. Its redemption details will remain in the ledger.</p>{revokeError && <p role="alert" className="mt-4! text-sm text-rose-200">{revokeError}</p>}<div className="mt-6 flex flex-wrap gap-3"><button className={secondaryButton} disabled={pending} onClick={() => setRevokeId(null)}>Cancel</button><button className={primaryButton} disabled={pending} onClick={revoke}>{pending ? 'Revoking…' : 'Confirm revocation'}</button></div></>}
+      {revokeId && <><h2 id="revoke-title" className="text-xl font-semibold">Revoke this license?</h2><p className="mt-3! text-sm leading-6 text-white/70">This license will no longer be valid. Its buyer and activation details will remain in the ledger, and its inventory key stays assigned.</p>{revokeError && <p role="alert" className="mt-4! text-sm text-rose-200">{revokeError}</p>}<div className="mt-6 flex flex-wrap gap-3"><button className={secondaryButton} disabled={pending} onClick={() => setRevokeId(null)}>Cancel</button><button className={primaryButton} disabled={pending} onClick={revoke}>{pending ? 'Revoking…' : 'Confirm revocation'}</button></div></>}
     </dialog>
   </section>;
 }
