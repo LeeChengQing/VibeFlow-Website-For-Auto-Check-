@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createAdminSession, deleteAdminSession, requireAdminSession, verifyAdminPassword } from '@/lib/admin-auth';
 import { generateActivationCode, hashActivationCode } from '@/lib/admin-keys';
+import { encryptLicenseKey } from '@/lib/license-key-encryption';
 import { isKeyPlan, type ActionError } from '@/lib/admin-key-options';
 import { getSupabaseAdmin, type KeyInventoryInsert } from '@/lib/supabase/admin';
 
@@ -34,7 +35,10 @@ export async function generateKeysAction(plan: string, count: number): Promise<s
     }
     const db = await getSupabaseAdmin();
     const codes = Array.from({ length: count }, generateActivationCode);
-    const rows: KeyInventoryInsert[] = codes.map(code => ({ key_hash: hashActivationCode(code), plan_type: plan, status: 'available' }));
+    const rows: KeyInventoryInsert[] = codes.map(code => {
+      const key_hash = hashActivationCode(code);
+      return { key_hash, encrypted_key: encryptLicenseKey(code, key_hash), plan_type: plan, status: 'available' };
+    });
     // A single multi-row INSERT is atomic. Do not insert per code or return DB records.
     const { error } = await db.from('key_inventory').insert(rows);
     if (error) return { error: 'Could not create the batch. Please try again.' };

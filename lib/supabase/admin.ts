@@ -11,6 +11,7 @@ export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded';
 export type KeyInventoryRow = {
   id: string;
   key_hash: string;
+  encrypted_key: string | null;
   plan_type: ActivationKeyPlan;
   status: KeyInventoryStatus;
 };
@@ -24,6 +25,7 @@ export type IssuedLicenseRow = {
   device_id: string | null;
   status: IssuedLicenseStatus;
   activated_at: string | null;
+  expires_at: string | null;
 };
 
 export type OrderRow = {
@@ -42,10 +44,10 @@ export type OrderRow = {
   fulfillment_error: 'INVENTORY_EXHAUSTED' | null;
 };
 
-export type KeyInventoryInsert = Pick<KeyInventoryRow, 'key_hash' | 'plan_type'> &
+export type KeyInventoryInsert = Pick<KeyInventoryRow, 'key_hash' | 'encrypted_key' | 'plan_type'> &
   Partial<Pick<KeyInventoryRow, 'id' | 'status'>>;
 export type IssuedLicenseInsert = Pick<IssuedLicenseRow, 'order_id' | 'inventory_id' | 'buyer_email' | 'plan_type'> &
-  Partial<Pick<IssuedLicenseRow, 'id' | 'device_id' | 'status' | 'activated_at'>>;
+  Partial<Pick<IssuedLicenseRow, 'id' | 'device_id' | 'status' | 'activated_at' | 'expires_at'>>;
 export type OrderInsert = Omit<OrderRow, 'id' | 'status' | 'provider_payment_id' | 'paid_at' | 'provider_request_id' | 'payment_confirmed_at' | 'fulfillment_error'> &
   Partial<Pick<OrderRow, 'id' | 'status' | 'provider_payment_id' | 'paid_at' | 'provider_request_id' | 'payment_confirmed_at' | 'fulfillment_error'>>;
 
@@ -88,7 +90,7 @@ export type AdminDatabase = {
     };
     Views: Record<string, never>;
     Functions: {
-      assign_available_key: { Args: { p_order_id: string }; Returns: string };
+      assign_available_key: { Args: { p_order_id: string }; Returns: string | null };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

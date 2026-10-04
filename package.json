@@ -13,7 +13,8 @@
     "test:perf": "npm run build && playwright test --config playwright.perf.config.ts",
     "test:performance-audit": "npm run build && playwright test --config playwright.audit.config.ts",
     "test:ui:prod": "npm run build && playwright test --config playwright.production.config.ts",
-    "dev:admin": "node scripts/admin-preview.mjs"
+    "dev:admin": "node scripts/admin-preview.mjs",
+    "keys:generate-intl": "node --env-file=.env.local scripts/generate-intl-keys.js"
   },
   "engines": {
     "node": ">=24"

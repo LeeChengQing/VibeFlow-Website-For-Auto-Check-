@@ -57,12 +57,14 @@ export async function POST(request: Request) {
     let responseBody = '';
     const startedAt = Date.now();
     const amount = (amountMinor / 100).toFixed(2);
+    const redirectUrl = new URL('/success', request.url);
+    redirectUrl.searchParams.set('order_id', reference);
     // HitPay's JSON schema declares a number in major units. Its notification
     // and repeated-payment flags are strings, not JSON booleans.
     const requestPayload = {
       email, currency: 'MYR', amount: Number(amount),
       reference_number: reference, purpose: `Auto-Check ${plan}`,
-      redirect_url: new URL('/success', request.url).href,
+      redirect_url: redirectUrl.href,
       allow_repeated_payments: 'false', send_email: 'false', send_sms: 'false',
     };
     const requestBody = JSON.stringify(requestPayload);

@@ -59,7 +59,9 @@ export async function POST(request: Request) {
       } catch { console.error('CRITICAL HITPAY_FULFILLMENT_ALERT_SAVE_FAILED', { orderId: order.id }); }
       return hitPayResponse({ ok: true });
     }
-    if (fulfillmentError || !licenseId) throw new Error('FULFILLMENT_FAILED');
+    if (fulfillmentError || (order.plan === 'extension' ? licenseId !== null : !licenseId)) {
+      throw new Error('FULFILLMENT_FAILED');
+    }
     const { error: cleanupError } = await supabase.from('orders').update({ fulfillment_error: null })
       .eq('id', order.id).eq('status', 'paid').eq('provider_payment_id', payment.paymentId);
     if (cleanupError) console.error('HITPAY_FULFILLMENT_ALERT_CLEAR_FAILED', { orderId: order.id });

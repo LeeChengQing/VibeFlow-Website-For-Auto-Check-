@@ -28,7 +28,10 @@ async function database() {
     `);
     await db.exec(readFileSync('supabase/migrations/20261004032804_commerce_and_inventory.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/20261004040308_create_fulfillment_rpc.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/20261004042022_hitpay_payment_tracking.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/20261004115610_enable_extension_checkout.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/20261004171118_keyless_extension_license_delivery.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/20261004172416_license_expiration_dates.sql', 'utf8'));
     fulfillmentDb = db;
     return db;
   } catch (error) { await db.close(); throw error; }
@@ -43,8 +46,9 @@ async function order(db: PGlite, reference: string, plan = 'bundle', status = 'p
 
 async function stock(db: PGlite, hash: string, plan = 'bundle') {
   return (await db.query<{ id: string }>(`
-    insert into public.key_inventory (key_hash, plan_type) values ($1, $2) returning id
-  `, [hash, plan])).rows[0].id;
+    insert into public.key_inventory (key_hash, encrypted_key, plan_type)
+    values ($1, 'v1.test-ciphertext', $2) returning id
+  `, [hash, plan === 'bundle' ? 'semester' : plan])).rows[0].id;
 }
 
 async function assign(db: PGlite, id: string | null) {
@@ -69,7 +73,7 @@ test('fulfillment RPC is a definer with a fixed public search path and denies ev
       where oid = 'public.assign_available_key(uuid)'::regprocedure
     `);
     assert.equal(rows[0].prosecdef, true);
-    assert.deepEqual(rows[0].proconfig, ['search_path=public']);
+    assert.deepEqual(rows[0].proconfig, ['search_path=""']);
     for (const role of ['anon', 'authenticated', 'unrelated_role']) {
       await db.exec(`set role ${role}`);
       await assert.rejects(assign(db, null), /permission denied for function/);
@@ -84,20 +88,28 @@ test('fulfillment assigns exactly one matching key, copies order ownership, reco
   const db = await database();
   try {
     await db.exec('set role service_role');
-    for (const [index, plan] of ['bundle', 'semester', 'yearly', 'internal_check', 'extension'].entries()) {
+    for (const [index, plan] of ['bundle', 'semester', 'yearly', 'internal_check'].entries()) {
+      const targetPlan = plan === 'bundle' ? 'semester' : plan;
       const id = await order(db, `ORDER-${plan}`, plan);
-      await stock(db, (index + 1).toString(16).repeat(64), plan);
-      await stock(db, (index + 6).toString(16).repeat(64), plan);
+      await stock(db, (index + 1).toString(16).repeat(64), targetPlan);
+      await stock(db, (index + 6).toString(16).repeat(64), targetPlan);
       const licenseId = await assign(db, id);
-      const license = (await db.query<{ inventory_id: string; order_id: string; buyer_email: string; plan_type: string; status: string; device_id: null; activated_at: null }>(
-        'select inventory_id, order_id, buyer_email, plan_type, status, device_id, activated_at from public.issued_licenses where id=$1', [licenseId]
+      const license = (await db.query<{ inventory_id: string; order_id: string; buyer_email: string; plan_type: string; status: string; device_id: null; activated_at: null; expires_at: string | null }>(
+        'select inventory_id, order_id, buyer_email, plan_type, status, device_id, activated_at, expires_at from public.issued_licenses where id=$1', [licenseId]
       )).rows[0];
       assert.equal(license.order_id, id);
       assert.equal(license.buyer_email, 'owner@example.com');
-      assert.equal(license.plan_type, plan);
+      assert.equal(license.plan_type, targetPlan);
       assert.equal(license.status, 'active');
       assert.equal(license.device_id, null);
       assert.equal(license.activated_at, null);
+      if (targetPlan === 'semester' || targetPlan === 'yearly') {
+        const paidAt = (await db.query<{ paid_at: string }>('select paid_at from public.orders where id=$1', [id])).rows[0].paid_at;
+        const expectedDays = targetPlan === 'semester' ? 130 : 365;
+        assert.equal(Date.parse(license.expires_at!) - Date.parse(paidAt), expectedDays * 24 * 60 * 60 * 1000);
+      } else {
+        assert.equal(license.expires_at, null);
+      }
       assert.equal((await db.query<{ status: string }>(
         'select status from public.key_inventory where id=$1', [license.inventory_id]
       )).rows[0].status, 'assigned');
@@ -109,8 +121,8 @@ test('fulfillment assigns exactly one matching key, copies order ownership, reco
       assert.equal(await assign(db, id), licenseId);
       assert.deepEqual(await snapshot(db), before);
       assert.equal((await db.query<{ count: number }>(
-        "select count(*)::int as count from public.key_inventory where plan_type=$1 and status='available'", [plan]
-      )).rows[0].count, 1);
+        "select count(*)::int as count from public.key_inventory where plan_type=$1 and status='available'", [targetPlan]
+      )).rows[0].count, targetPlan === 'semester' && plan === 'semester' ? 2 : 1);
     }
   } finally { await db.exec('reset role'); }
 });
@@ -132,24 +144,26 @@ test('unknown, cancelled, refunded and inconsistent paid orders cannot consume i
   } finally { await db.exec('reset role'); }
 });
 
-test('extension orders cannot consume bundle inventory and the expanded constraints preserve service-only access', async () => {
+test('extension orders are paid without inventory allocation and the expanded constraints preserve service-only access', async () => {
   const db = await database();
   try {
     await db.exec('set role service_role');
     const id = await order(db, 'EXTENSION-ORDER', 'extension');
     const bundleStock = await stock(db, 'a'.repeat(64), 'bundle');
-    await assert.rejects(assign(db, id), /INVENTORY_EXHAUSTED/);
-    const extensionStock = await stock(db, 'b'.repeat(64), 'extension');
     const licenseId = await assign(db, id);
-    assert.equal((await db.query<{ inventory_id: string }>(
-      'select inventory_id from public.issued_licenses where id=$1', [licenseId]
-    )).rows[0].inventory_id, extensionStock);
+    assert.equal(licenseId, null);
+    assert.equal((await db.query<{ status: string }>('select status from public.orders where id=$1', [id])).rows[0].status, 'paid');
+    assert.equal((await db.query<{ count: number }>('select count(*)::int as count from public.issued_licenses')).rows[0].count, 0);
+    assert.equal(await assign(db, id), null);
     assert.equal((await db.query<{ status: string }>(
       'select status from public.key_inventory where id=$1', [bundleStock]
     )).rows[0].status, 'available');
     await assert.rejects(order(db, 'INVALID-PLAN', 'unknown'), /orders_plan_check/);
     await assert.rejects(stock(db, 'c'.repeat(64), 'unknown'), /key_inventory_plan_type_check/);
-    await assert.rejects(db.query("update public.issued_licenses set plan_type='unknown' where id=$1", [licenseId]), /issued_licenses_plan_type_check/);
+    const constraintOrder = await order(db, 'CONSTRAINT-ORDER');
+    await assert.rejects(db.query(`insert into public.issued_licenses
+      (order_id, inventory_id, buyer_email, plan_type)
+      values ($1, $2, 'owner@example.com', 'unknown')`, [constraintOrder, bundleStock]), /issued_licenses_plan_type_check/);
     await db.exec('reset role');
     const before = await snapshot(db);
     await db.exec(readFileSync('supabase/migrations/20261004115610_enable_extension_checkout.sql', 'utf8'));
@@ -181,8 +195,8 @@ test('inventory exhaustion rolls back payment and issuance, then replenishment c
     await stock(db, 'b'.repeat(64));
     assert.match(await assign(db, id), /^[0-9a-f-]{36}$/);
     assert.equal((await db.query<{ count: number }>(
-      "select count(*)::int as count from public.key_inventory where plan_type='yearly' and status='available'"
-    )).rows[0].count, 1);
+      "select count(*)::int as count from public.key_inventory where plan_type='semester' and status='available'"
+    )).rows[0].count, 0);
   } finally { await db.exec('reset role'); }
 });
 

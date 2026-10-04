@@ -13,3 +13,4 @@ test-results/
 playwright-report/
 .superpowers/
 *.tsbuildinfo
+generated_keys/

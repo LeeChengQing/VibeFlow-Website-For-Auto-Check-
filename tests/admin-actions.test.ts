@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import { loadServerModule } from './helpers/server-module';
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 
 type Actions = typeof import('../app/admin/actions');
+type LicenseEncryption = { encryptLicenseKey(plaintext: string, keyHash: string): string; decryptLicenseKey(encoded: string, keyHash: string): string };
+const previousEncryptionKey = process.env.LICENSE_KEY_ENCRYPTION_KEY;
+process.env.LICENSE_KEY_ENCRYPTION_KEY ??= Buffer.alloc(32, 9).toString('base64');
+const encryption = loadServerModule<LicenseEncryption>('lib/license-key-encryption.ts', {});
+
+after(() => {
+  if (previousEncryptionKey === undefined) delete process.env.LICENSE_KEY_ENCRYPTION_KEY;
+  else process.env.LICENSE_KEY_ENCRYPTION_KEY = previousEncryptionKey;
+});
+
 function setup(options: { authorized?: boolean; dbError?: boolean; passwordValid?: boolean; unavailable?: boolean } = {}) {
   const batches: Record<string, unknown>[][] = [];
   const events: string[] = [];
@@ -13,6 +23,7 @@ function setup(options: { authorized?: boolean; dbError?: boolean; passwordValid
   const actions = loadServerModule<Actions>('app/admin/actions.ts', {
     '@/lib/admin-key-options': shared,
     '@/lib/admin-keys': keys,
+    '@/lib/license-key-encryption': encryption,
     '@/lib/admin-auth': {
       verifyAdminPassword: async () => {
         if (options.unavailable) throw new Error('sensitive configuration detail');
@@ -69,7 +80,7 @@ test('unauthorized or invalid provisioning never inserts or returns codes', asyn
   assert.deepEqual(events, []);
 });
 
-test('one batch insert persists only hashes and returns plaintext after success', async () => {
+test('one batch insert persists hashes and encrypted keys, then returns plaintext after success', async () => {
   const { actions, batches, events, keys } = setup();
   for (const plan of ['bundle', 'semester', 'yearly', 'internal_check']) {
     const result = await actions.generateKeysAction(plan, 100);
@@ -78,8 +89,9 @@ test('one batch insert persists only hashes and returns plaintext after success'
     const batch = batches.at(-1)!;
     assert.equal(batch.length, 100);
     batch.forEach((row, index) => {
-      assert.deepEqual(Object.keys(row).sort(), ['key_hash', 'plan_type', 'status']);
+      assert.deepEqual(Object.keys(row).sort(), ['encrypted_key', 'key_hash', 'plan_type', 'status']);
       assert.equal(row.key_hash, keys.hashActivationCode(result[index]));
+      assert.equal(encryption.decryptLicenseKey(row.encrypted_key as string, row.key_hash as string), result[index]);
       assert.equal(row.plan_type, plan);
       assert.equal(row.status, 'available');
     });

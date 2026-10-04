@@ -9,38 +9,30 @@ import { useLocale } from './LocaleProvider';
 
 export type PaymentReturnStatus = 'success' | 'processing' | 'pending' | 'not_paid' | 'unverified' | 'unavailable';
 
-export function PaymentReturn({ status }: { status: PaymentReturnStatus }) {
+export function PaymentReturn({ status, downloadExtension = false, licenseKey, licensePlan, deliveryUnavailable = false }: {
+  status: PaymentReturnStatus;
+  downloadExtension?: boolean;
+  licenseKey?: string;
+  licensePlan?: 'semester' | 'yearly';
+  deliveryUnavailable?: boolean;
+}) {
   const router = useRouter();
   const { t } = useLocale();
   const reducedMotion = useReducedMotion();
-  const [countdown, setCountdown] = useState(5);
-  const navigationStarted = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  const [copyResult, setCopyResult] = useState<'copied' | 'failed' | null>(null);
   const confirmed = status === 'success' || status === 'processing';
-  const checking = countdown > 0 && ['pending', 'processing', 'unavailable'].includes(status);
+  const checking = ['pending', 'processing', 'unavailable'].includes(status);
 
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
-    const startedAt = Date.now();
-    const interval = window.setInterval(() => {
-      const remaining = Math.max(0, 5 - Math.floor((Date.now() - startedAt) / 1000));
-      setCountdown(remaining);
-      if (remaining === 0) window.clearInterval(interval);
-    }, 1000);
-    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (!checking) return;
-    const interval = window.setInterval(() => router.refresh(), 1000);
+    const interval = window.setInterval(() => router.refresh(), 2000);
     return () => window.clearInterval(interval);
   }, [checking, router]);
-
-  useEffect(() => {
-    if (countdown !== 0 || navigationStarted.current) return;
-    navigationStarted.current = true;
-    router.push('/');
-  }, [countdown, router]);
 
   const title = status === 'success'
     ? t('付款成功！', 'Payment Successful!')
@@ -53,14 +45,30 @@ export function PaymentReturn({ status }: { status: PaymentReturnStatus }) {
           : t('付款确认', 'Payment confirmation');
 
   const description = status === 'success'
-    ? t('付款已确认，您的许可证已签发。', 'Your payment is confirmed and your license has been issued.')
+    ? deliveryUnavailable
+      ? t('付款已确认，但许可证暂时无法显示。请联系支持。', 'Your payment is confirmed, but the license could not be displayed. Please contact support.')
+      : t('付款已确认。', 'Your payment is confirmed.')
     : status === 'processing'
-      ? t('付款已确认，您的许可证正在准备中。如需帮助，请联系支持。', 'Your payment is confirmed. Your license is being prepared. Contact support if you need help.')
+      ? t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.')
       : status === 'pending'
         ? t('我们正在等待 HitPay 的安全付款确认。请勿重复付款。', 'We are waiting for secure payment confirmation from HitPay. Please do not pay again.')
         : status === 'not_paid'
           ? t('此订单未显示为已付款。如您已被扣款，请联系支持。', 'This order is not marked as paid. Contact support if you were charged.')
           : t('目前无法确认此付款。如您已付款，请联系支持，勿重复付款。', 'We could not confirm this payment yet. If you have paid, contact support rather than paying again.');
+
+  function getDownloadUrl() {
+    return new URL('/downloads/auto-check-extension.zip', window.location.origin).href;
+  }
+
+  async function copyDownloadLink() {
+      const url = getDownloadUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyResult('copied');
+    } catch {
+      setCopyResult('failed');
+    }
+  }
 
   return (
     <section className="grid min-h-[100dvh] place-items-center bg-[#080809] px-2 py-16 text-white sm:px-6" aria-labelledby="payment-return-title">
@@ -87,13 +95,39 @@ export function PaymentReturn({ status }: { status: PaymentReturnStatus }) {
           <p className="mt-4 text-sm leading-7 text-white/60">{description}</p>
         </div>
         <div className="my-8 h-px bg-white/10" aria-hidden="true" />
-        <p className="text-sm tabular-nums text-white/50" aria-live="polite" aria-atomic="true">
-          {t(`${countdown} 秒后返回首页…`, `Returning to homepage in ${countdown}s...`)}
-        </p>
+        {licenseKey && status === 'success' && <div className="mb-6 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-5 py-5 text-left">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/75">
+            {licensePlan === 'yearly' ? t('年度手机通知许可证密钥', 'Yearly notification license key') : t('学期手机通知许可证密钥', 'Semester notification license key')}
+          </p>
+          <code className="mt-3 block select-all break-all rounded-lg bg-black/30 px-4 py-3 font-mono text-lg font-semibold leading-7 text-white" aria-label={t('许可证密钥', 'License key')}>
+            {licenseKey}
+          </code>
+        </div>}
+        {downloadExtension && status === 'success' && <div className="mt-6 flex flex-col items-center gap-3">
+          <a href="/downloads/auto-check-extension.zip" download className="inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-300 px-8 text-base font-bold text-[#07130e] shadow-lg shadow-emerald-950/40 transition-colors hover:bg-emerald-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-200">
+            {t('下载扩展程序（.zip）', 'Download Extension (.zip)')}
+          </a>
+          <button type="button" onClick={copyDownloadLink} className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+            {t('复制下载链接', 'Copy Download Link')}
+          </button>
+          <p className="max-w-sm text-xs leading-5 text-white/50">
+            {t('注意：如果您正在使用电子钱包应用（例如 TNG）且下载没有开始，请复制链接并在 Chrome 或 Safari 中打开。', 'Note: If you are inside an e-wallet app (like TNG) and the download doesn\'t start, please copy the link and open it in Chrome or Safari.')}
+          </p>
+          {copyResult && <div className="max-w-sm text-xs text-white/70" role="status" aria-live="polite">
+            {copyResult === 'copied'
+              ? t('链接已复制。', 'Download link copied.')
+              : <>
+                <span>{t('无法自动复制，请长按此链接并选择复制：', 'Could not copy automatically. Press and hold this link to copy it:')}</span>
+                <code className="mt-2 block select-all break-all rounded-lg bg-black/30 px-3 py-2 text-left text-emerald-100">
+                    {getDownloadUrl()}
+                </code>
+              </>}
+          </div>}
+        </div>}
         <Link href="/" className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-[#111317] transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
           {t('立即返回首页', 'Return to homepage now')}<ArrowRight className="size-4" aria-hidden="true" />
         </Link>
-        {status !== 'success' && <p className="mt-5 text-sm"><Link href="/support" className="text-white/60 underline underline-offset-4 hover:text-white">{t('联系支持', 'Contact support')}</Link></p>}
+        {(status !== 'success' || deliveryUnavailable) && <p className="mt-5 text-sm"><Link href="/support" className="text-white/60 underline underline-offset-4 hover:text-white">{t('联系支持', 'Contact support')}</Link></p>}
       </m.div>
     </section>
   );

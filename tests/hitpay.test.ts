@@ -41,7 +41,7 @@ function fixture(options: { admin?: boolean; rpcError?: string; dbError?: boolea
     rpc: async (name: string, args: any) => {
       calls.push({ rpc: name, args });
       if (options.rpcError) return { data: null, error: { message: options.rpcError } };
-      row.status = 'paid'; return { data: 'license-id', error: null };
+      row.status = 'paid'; return { data: row.plan === 'extension' ? null : 'license-id', error: null };
     },
   };
   const taskEnv = { ...env, ...options.env };
