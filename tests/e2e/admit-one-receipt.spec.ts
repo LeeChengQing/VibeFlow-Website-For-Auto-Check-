@@ -99,8 +99,9 @@ test('capture localized hero, both billing periods, and checkout across viewport
     for (const [width, height] of [[1366,768],[1440,900],[1536,864],[1920,1080],[390,844]] as const) {
       await page.setViewportSize({ width, height });
       await page.goto(`/?locale=${locale}`);
-      await expect(page.locator('.hero-checkout')).toBeVisible();
-      await page.locator('.hero-checkout').screenshot({ path: `.local/admit-one-screenshots/hero-${locale}-${width}x${height}.png` });
+      const hero = page.locator(width < 768 ? '.mobile-purchase' : '.hero-checkout');
+      await expect(hero).toBeVisible();
+      await hero.screenshot({ path: `.local/admit-one-screenshots/hero-${locale}-${width}x${height}.png` });
       await page.locator('#pricing').scrollIntoViewIfNeeded();
       for (const [period, label] of (locale === 'zh' ? [['semester','学期'],['yearly','年付']] : [['semester','Semester'],['yearly','Yearly']]) as [string,string][]) {
         const card = page.locator('.price-card.featured');

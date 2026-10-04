@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 for (const viewport of [
   { width: 1366, height: 768 },
   { width: 1440, height: 1000 },
-  { width: 390, height: 844 },
+  { width: 820, height: 1180 },
 ]) {
 test(`package selection preserves the hero text and canvas at ${viewport.width}px`, async ({ page }) => {
   await page.setViewportSize(viewport);

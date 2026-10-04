@@ -15,6 +15,8 @@ const purchaseLocale = {
     compactTimer: '{days}天 {hours}时',
     fullTimer: '{days}天 {hours}时 {minutes}分 {seconds}秒',
     mobileBillingLabel: '手机通知计费周期',
+    mobileTimer: '{days}天 {hours}时 {minutes}分',
+    mobileShortTimer: '{hours}时 {minutes}分',
   },
   en: {
     semester: 'Semester',
@@ -30,6 +32,8 @@ const purchaseLocale = {
     compactTimer: '{days}d {hours}h',
     fullTimer: '{days}d {hours}h {minutes}m {seconds}s',
     mobileBillingLabel: 'Mobile notification billing period',
+    mobileTimer: '{days}d {hours}h {minutes}m',
+    mobileShortTimer: '{hours}h {minutes}m',
   },
 } as const;
 
@@ -45,7 +49,7 @@ export function billingPeriodText(locale: Locale, plan: NotificationBillingPlan)
 
 export function formatPurchaseText(
   locale: Locale,
-  key: 'bundleSave' | 'savingsPercent' | 'compactTimer' | 'fullTimer',
+  key: 'bundleSave' | 'savingsPercent' | 'compactTimer' | 'fullTimer' | 'mobileTimer' | 'mobileShortTimer',
   values: Record<string, string | number>,
 ) {
   return purchaseText(locale, key).replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));

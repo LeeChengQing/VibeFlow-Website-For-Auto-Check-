@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .next-e2e/
+.next-mobile-e2e/
 .next-admin-e2e/
 .next-admin-test/
 .next-hitpay-test/

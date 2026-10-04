@@ -87,11 +87,12 @@ test('storefront email entry retains the document and correct purchase amount be
   await page.evaluate(() => Object.assign(window, { navigationMarker: 'same-document' }));
   const hero = page.locator('.hero-checkout');
   await hero.getByRole('button', { name: 'Get complete bundle' }).click();
-  await expect(hero.getByLabel('Delivery email', { exact: true })).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: 'Complete your purchase' });
+  await expect(dialog.getByLabel('Delivery email', { exact: true })).toBeVisible();
   await expect(hero).toContainText('RM 30.00');
   expect(await page.evaluate(() => (window as unknown as { navigationMarker?: string }).navigationMarker)).toBe('same-document');
-  await hero.getByLabel('Delivery email', { exact: true }).fill('performance@example.com');
-  await hero.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialog.getByLabel('Delivery email', { exact: true }).fill('performance@example.com');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(hero.getByRole('button', { name: 'Get complete bundle' })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { navigationMarker?: string }).navigationMarker)).toBe('same-document');
 });
@@ -163,13 +164,13 @@ test('ambient video yields immediately to a hero package change', async ({ page 
 test('hero package details and purchase action fit desktop and mobile', async ({ page }, testInfo) => {
   await page.goto('/');
   await expect(page.locator('.hero-line').last()).toHaveCSS('transform', 'none');
-  const hero = page.locator('.hero-checkout');
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const product of [/Complete experience bundle/, /Browser extension/, /Mobile notifications/]) {
+    const hero = page.locator(width < 768 ? '.mobile-purchase' : '.hero-checkout');
+    for (const product of (width < 768 ? [/^Complete/, /^Extension/, /^Mobile/] : [/Complete experience bundle/, /Browser extension/, /Mobile notifications/])) {
       await hero.getByRole('radio', { name: product }).click();
       const fits = await hero.evaluate(card => {
-        const button = card.querySelector('.hero-checkout-footer .button')!;
+        const button = card.querySelector('.mobile-inline-cta .button, .hero-checkout-footer .button')!;
         return button.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom;
       });
       expect(fits).toBe(true);

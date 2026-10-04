@@ -205,18 +205,18 @@ test('hero recommends the complete bundle while keeping notification plans optio
   await expect(hero.locator('.mini-bundle-original-price')).toHaveText('RM 35.00');
   await expect(hero.locator('.mini-bundle-promo')).toContainText('LIMITED-TIME DEAL');await expect(hero.locator('.mini-bundle-promo')).toContainText('Save RM 5.00');
   await expect(hero.locator('.mini-bundle-countdown')).toHaveText(/^\d+d \d{2}h \d{2}m \d{2}s$/);
-  await hero.getByRole('button',{name:'Get complete bundle'}).click();await expect(hero.getByLabel('Delivery email',{exact:true})).toBeVisible();await expect(hero.getByRole('button',{name:'Continue to HitPay'})).toBeVisible();await expect(hero).toContainText('RM 30.00');
+  await hero.getByRole('button',{name:'Get complete bundle'}).click();await expect(page.getByRole('dialog').getByLabel('Delivery email',{exact:true})).toBeVisible();await expect(page.getByRole('dialog').getByRole('button',{name:'Continue to HitPay'})).toBeVisible();await expect(hero).toContainText('RM 30.00');
   await page.goto('/');const notificationHero=page.locator('.hero-checkout');await notificationHero.getByRole('radio',{name:/Mobile notifications/}).click();
   const tabs=notificationHero.getByRole('tablist').getByRole('tab');await expect(tabs).toHaveCount(2);
   await expect(tabs.nth(0)).toHaveText('Semester');await expect(tabs.nth(1)).toHaveText('Yearly');
   await expect(notificationHero).not.toContainText('Degree Pass');await expect(notificationHero).not.toContainText('RM 49.99');
   await tabs.nth(1).focus();await page.keyboard.press('ArrowRight');await expect(tabs.nth(0)).toHaveAttribute('aria-selected','true');
   await expect(notificationHero).toContainText('RM 11.99');
-  await notificationHero.getByRole('button',{name:'Enable mobile notifications · Semester'}).click();await expect(notificationHero.getByLabel('Delivery email',{exact:true})).toBeVisible();await expect(notificationHero).toContainText('RM 11.99');
+  await notificationHero.getByRole('button',{name:'Enable mobile notifications · Semester'}).click();await expect(page.getByRole('dialog').getByLabel('Delivery email',{exact:true})).toBeVisible();await expect(notificationHero).toContainText('RM 11.99');
   await page.goto('/');const extensionHero=page.locator('.hero-checkout');await extensionHero.getByRole('radio',{name:/Browser extension/}).click();
   await expect(extensionHero.getByRole('tablist')).toHaveCount(0);await expect(extensionHero).toContainText('RM 24.99');
   await expect(extensionHero.getByRole('button',{name:'Buy browser extension'})).toBeDisabled();await expect(extensionHero.locator('.buy-action')).toContainText('Standalone extension checkout is unavailable');
-  await page.goto('/');await page.setViewportSize({width:390,height:844});const mobileHero=page.locator('.hero-checkout');await mobileHero.getByRole('radio',{name:/Mobile notifications/}).click();
+  await page.goto('/');await page.setViewportSize({width:390,height:844});const mobileHero=page.locator('.mobile-purchase');await mobileHero.getByRole('radio',{name:'Mobile',exact:true}).click();await mobileHero.getByRole('button',{name:'View notification plans'}).click();
   const mobileTabs=mobileHero.getByRole('tablist');for(const tab of await mobileTabs.getByRole('tab').all()){const bounds=await tab.boundingBox();expect(bounds?.height).toBeGreaterThanOrEqual(40);expect(await tab.evaluate(el=>getComputedStyle(el).whiteSpace)).toBe('nowrap');}
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.emulateMedia({reducedMotion:'reduce'});await mobileTabs.getByRole('tab',{name:'Yearly'}).focus();await page.keyboard.press('ArrowRight');await expect(mobileTabs.getByRole('tab',{name:'Semester'})).toHaveAttribute('aria-selected','true');

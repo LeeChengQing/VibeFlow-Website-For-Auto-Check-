@@ -25,10 +25,8 @@ test('home, checkout and paid order have no horizontal overflow at target widths
   }
 });
 
-test('hero purchase card keeps CTA and ambient toggle in a padded flow footer', async ({ page }) => {
+test('desktop hero purchase card keeps CTA and ambient toggle in a padded flow footer', async ({ page }) => {
   for (const viewport of [
-    { width: 390, height: 844 },
-    { width: 375, height: 667 },
     { width: 820, height: 1180 },
     { width: 1366, height: 768 },
   ]) {

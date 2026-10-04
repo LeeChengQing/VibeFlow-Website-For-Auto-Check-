@@ -6,6 +6,7 @@ import { useLocale } from './LocaleProvider';
 import { BuyButton } from './BuyButton';
 import { useBundleCountdown } from './useBundleCountdown';
 import { usePackagePrice, useSiteConfig } from './SiteConfigProvider';
+import { MobileBundleCard } from './MobileBundleCard';
 
 export function BundleOfferCard() {
   const { locale, t } = useLocale();
@@ -17,7 +18,7 @@ export function BundleOfferCard() {
   const values = { days: Math.floor(remaining / 86400), hours: String(Math.floor((remaining % 86400) / 3600)).padStart(2, '0'), minutes: String(Math.floor((remaining % 3600) / 60)).padStart(2, '0'), seconds: String(remaining % 60).padStart(2, '0') };
   if (!plan.visible) return null;
 
-  return <article className="price-card bundle-card">
+  return <><article className="price-card bundle-card desktop-bundle-card">
     <div className="bundle-card-heading">
       <div><p className="eyebrow">THE ALL-IN-ONE EXPERIENCE</p><h3>{plan.name[locale]}</h3><p>{plan.description[locale]}</p></div>
       {plan.badge[locale]&&<span className="bundle-badge">{plan.badge[locale]}</span>}
@@ -37,5 +38,5 @@ export function BundleOfferCard() {
       <ul className="bundle-features">{plan.features.map((item,index)=><li key={index}>{item[locale]}</li>)}</ul>
     </div>
     <BuyButton plan="bundle" className="button primary bundle-buy">{t('立即购买完整体验包','Get the complete bundle')}</BuyButton>
-  </article>;
+  </article><MobileBundleCard /></>;
 }
