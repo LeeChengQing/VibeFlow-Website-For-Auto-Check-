@@ -24,7 +24,7 @@ export async function getAdminDashboardData(params: AdminSearchParams): Promise<
   ]);
   if (results.some(result => result.error || result.count === null)) throw new Error('ADMIN_DATA_UNAVAILABLE');
   const counts = results.map(result => result.count!);
-  const matchingCount = counts[7];
+  const matchingCount = counts[3 + plans.length];
   const pageCount = Math.max(1, Math.ceil(matchingCount / KEY_PAGE_SIZE));
   const page = Math.min(requestedPage, pageCount);
   const offset = (page - 1) * KEY_PAGE_SIZE;
@@ -41,7 +41,7 @@ export async function getAdminDashboardData(params: AdminSearchParams): Promise<
 
   return {
     summary: { total: counts[0], available: counts[1], redeemed: counts[2],
-      plans: { bundle: counts[3], semester: counts[4], yearly: counts[5], internal_check: counts[6] } },
+      plans: Object.fromEntries(plans.map((value, index) => [value, counts[3 + index]])) as DashboardData['summary']['plans'] },
     keys: data.map(row => ({
       id: row.id, hashPrefix: row.key_hash.slice(0, 12), plan_type: row.plan_type, status: row.status,
       license_id: row.issued_licenses?.id ?? null,

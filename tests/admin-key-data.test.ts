@@ -23,7 +23,7 @@ function setup(failTable = '') {
       const plan = url.searchParams.get('plan_type');
       const status = url.searchParams.get('status');
       const count = table === 'issued_licenses' ? 22 : plan && status ? 26 : plan ? ({ 'eq.bundle': 40, 'eq.semester': 20,
-        'eq.yearly': 15, 'eq.internal_check': 5 }[plan] ?? 0) : status === 'eq.available' ? 55 : 80;
+        'eq.yearly': 15, 'eq.internal_check': 5, 'eq.extension': 7 }[plan] ?? 0) : status === 'eq.available' ? 55 : 87;
       return new Response(init?.method === 'HEAD' ? null : JSON.stringify(plan || status ? [row] : [row, issued, revoked]), {
         headers: { 'Content-Type': 'application/json', 'Content-Range': `0-0/${count}` },
       });
@@ -39,10 +39,11 @@ function setup(failTable = '') {
 test('filtered pages retain global summaries and expose hash prefixes only', async () => {
   const { data, requests } = setup();
   const result = await data.getAdminDashboardData({ plan: 'bundle', status: 'available', page: '999' });
-  assert.equal(result.summary.total, 80);
+  assert.equal(result.summary.total, 87);
   assert.equal(result.summary.available, 55);
   assert.equal(result.summary.redeemed, 22);
   assert.equal(result.summary.plans.bundle, 40);
+  assert.equal(result.summary.plans.extension, 7);
   assert.equal(result.matchingCount, 26);
   assert.equal(result.page, 2);
   assert.equal(result.pageCount, 2);

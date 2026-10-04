@@ -18,6 +18,33 @@ export function hitPaySandboxConfig() {
   return { apiKey, endpoint: 'https://api.sandbox.hit-pay.com/v1/payment-requests' };
 }
 
+/** Preserve a rejected provider body verbatim, except for known credential values. */
+export function hitPayRawDiagnosticText(text: string, credentials: string[]): string {
+  for (const value of credentials.filter(Boolean)) {
+    for (const representation of [value, JSON.stringify(value).slice(1, -1), encodeURIComponent(value)]) {
+      text = text.split(representation).join('[REDACTED]');
+    }
+  }
+  return text;
+}
+
+/** Bounded server diagnostics, preserving provider errors without credentials or buyer data. */
+export function hitPayDiagnosticText(text: string, sensitiveValues: string[] = []): string {
+  try {
+    text = JSON.stringify(JSON.parse(text), (key, value) =>
+      /^(api[_-]?key|x-business-api-key|authorization|password|salt|token|access_token|email|buyer_email|phone|name|address|metadata|url|redirect_url)$/i.test(key)
+        && typeof value === 'string' ? '[REDACTED]' : value);
+  } catch { /* Non-JSON gateway responses and network error messages are useful too. */ }
+  for (const value of sensitiveValues.filter(Boolean)) {
+    for (const representation of [value, JSON.stringify(value).slice(1, -1), encodeURIComponent(value)]) {
+      text = text.split(representation).join('[REDACTED]');
+    }
+  }
+  text = text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ');
+  return text.length > 4096 ? `${text.slice(0, 4096)}…[truncated]` : text;
+}
+
 /** Verify the bytes received, before any JSON decoding or database access. */
 export function verifyHitPaySignature(raw: Buffer, signature: string | null, salt: string): boolean {
   if (!salt || !signature || !/^[0-9a-fA-F]{64}$/.test(signature)) return false;
@@ -26,7 +53,7 @@ export function verifyHitPaySignature(raw: Buffer, signature: string | null, sal
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-export async function readHitPayBody(request: Request, limit: number): Promise<Buffer> {
+export async function readHitPayBody(request: Request | Response, limit: number): Promise<Buffer> {
   if (!request.body) throw new HitPayError('INVALID_BODY', 400);
   const reader = request.body.getReader();
   const chunks: Buffer[] = [];

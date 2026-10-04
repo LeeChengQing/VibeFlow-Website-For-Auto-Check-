@@ -4,14 +4,18 @@ import { getPublishedSiteConfig } from '@/lib/site-settings';
 import { packagePrice, purchaseAllowed } from '@/lib/site-config';
 import { getCommerceDatabase } from '@/lib/supabase/commerce';
 import type { ActivationKeyPlan } from '@/lib/supabase/admin';
+import { isHitPaySandboxCheckoutURL } from '@/lib/hitpay-checkout-url';
 import {
-  HitPayError, hitPayResponse, hitPaySandboxConfig, isHitPayUUID,
+  HitPayError, hitPayDiagnosticText, hitPayRawDiagnosticText, hitPayResponse, hitPaySandboxConfig, isHitPayUUID,
   parseHitPayJSON, readHitPayBody,
 } from '@/lib/hitpay';
 
 export const runtime = 'nodejs';
 
-const publicPlans = { bundle: 'bundle', semester: 'mobile_notification', yearly: 'mobile_notification_yearly' } as const;
+const publicPlans = {
+  bundle: 'bundle', extension: 'extension',
+  semester: 'mobile_notification', yearly: 'mobile_notification_yearly',
+} as const;
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +23,7 @@ export async function POST(request: Request) {
       throw new HitPayError('JSON_REQUIRED', 415);
     }
     const body = parseHitPayJSON(await readHitPayBody(request, 16_384));
-    if (typeof body.plan !== 'string' || !['bundle', 'semester', 'yearly', 'internal_check'].includes(body.plan) ||
+    if (typeof body.plan !== 'string' || !['bundle', 'extension', 'semester', 'yearly', 'internal_check'].includes(body.plan) ||
         typeof body.buyer_email !== 'string') throw new HitPayError('INVALID_CHECKOUT', 400);
     const plan = body.plan as ActivationKeyPlan;
     const email = body.buyer_email.trim().toLowerCase();
@@ -47,24 +51,57 @@ export async function POST(request: Request) {
     // A timeout may still create a provider request: retain the pending order and
     // do not automatically retry this POST or replace its identity.
     let payment: Record<string, unknown>;
+    let phase = 'request';
+    let providerStatus: number | undefined;
+    let responseContentType: string | null = null;
+    let responseBody = '';
+    const startedAt = Date.now();
+    const amount = (amountMinor / 100).toFixed(2);
+    // HitPay's JSON schema declares a number in major units. Its notification
+    // and repeated-payment flags are strings, not JSON booleans.
+    const requestPayload = {
+      email, currency: 'MYR', amount: Number(amount),
+      reference_number: reference, purpose: `Auto-Check ${plan}`,
+      allow_repeated_payments: 'false', send_email: 'false', send_sms: 'false',
+    };
+    const requestBody = JSON.stringify(requestPayload);
     try {
       const response = await fetch(endpoint, {
         method: 'POST', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15_000),
-        headers: { 'Content-Type': 'application/json', 'X-BUSINESS-API-KEY': apiKey },
-        body: JSON.stringify({
-          email, currency: 'MYR', amount: (amountMinor / 100).toFixed(2),
-          reference_number: reference, purpose: `Auto-Check ${plan}`,
-          allow_repeated_payments: 'false', send_email: 'false', send_sms: 'false',
-        }),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-BUSINESS-API-KEY': apiKey },
+        body: requestBody,
       });
-      if (!response.ok) throw new Error('PROVIDER_REJECTED');
-      payment = await response.json();
-      if (!payment || !isHitPayUUID(payment.id) || typeof payment.url !== 'string') throw new Error('INVALID_PROVIDER_RESPONSE');
-      const url = new URL(payment.url);
-      if (url.protocol !== 'https:' || url.hostname !== 'securecheckout.sandbox.hit-pay.com' ||
-          url.port || url.username || url.password) throw new Error('INVALID_CHECKOUT_URL');
-    } catch {
-      console.error('HITPAY_CHECKOUT_FAILED', { orderId: reference });
+      phase = 'response';
+      providerStatus = response.status;
+      responseContentType = response.headers.get('Content-Type');
+      if (!response.ok) {
+        responseBody = await response.text();
+        // Server-only diagnostic requested for provider rejection. The payload
+        // includes buyer email; never include authentication headers or salts.
+        console.error('HITPAY_PROVIDER_REJECTED', {
+          orderId: reference, endpoint, providerStatus,
+          responseBody: hitPayRawDiagnosticText(responseBody, [apiKey, process.env.HITPAY_WEBHOOK_SALT ?? '']),
+          requestPayload: requestBody,
+        });
+        throw new Error('PROVIDER_REJECTED');
+      }
+      responseBody = (await readHitPayBody(response, 65_536)).toString('utf8');
+      phase = 'decode';
+      payment = JSON.parse(responseBody);
+      phase = 'validate';
+      if (!payment || Array.isArray(payment) || !isHitPayUUID(payment.id) || typeof payment.url !== 'string') throw new Error('INVALID_PROVIDER_RESPONSE');
+      if (!isHitPaySandboxCheckoutURL(payment.url)) throw new Error('INVALID_CHECKOUT_URL');
+    } catch (error) {
+      const sensitive = [apiKey, email, process.env.HITPAY_WEBHOOK_SALT ?? ''];
+      const clean = (value: unknown) => value === undefined ? undefined : hitPayDiagnosticText(String(value), sensitive);
+      const failure = error as { name?: unknown; message?: unknown; cause?: { code?: unknown; message?: unknown } } | null;
+      console.error('HITPAY_CHECKOUT_FAILED', {
+        orderId: reference, endpoint, environment: 'sandbox', plan, amount, currency: 'MYR',
+        phase, providerStatus, responseContentType, elapsedMs: Date.now() - startedAt,
+        errorName: clean(failure?.name), errorMessage: clean(failure?.message ?? error),
+        causeCode: clean(failure?.cause?.code), causeMessage: clean(failure?.cause?.message),
+        responseBody: hitPayDiagnosticText(responseBody, sensitive),
+      });
       throw new HitPayError('PAYMENT_PROVIDER_UNAVAILABLE', 502);
     }
     const { data: saved, error: saveError } = await supabase.from('orders')

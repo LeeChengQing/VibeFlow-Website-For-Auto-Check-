@@ -3,7 +3,7 @@ import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdminSession } from '@/lib/admin-auth';
 
-export type ActivationKeyPlan = 'bundle' | 'semester' | 'yearly' | 'internal_check';
+export type ActivationKeyPlan = 'bundle' | 'extension' | 'semester' | 'yearly' | 'internal_check';
 export type KeyInventoryStatus = 'available' | 'assigned';
 export type IssuedLicenseStatus = 'active' | 'revoked';
 export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded';

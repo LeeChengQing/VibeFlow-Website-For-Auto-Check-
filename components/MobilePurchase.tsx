@@ -55,7 +55,7 @@ export function MobilePurchase() {
     : product === 'extension' ? `${t('购买扩展', 'Get extension')} · ${mobileMoney(amount)}`
     : `${t('开通手机通知', 'Get notifications')} · ${mobileMoney(amount)}`;
   const label = (value: Product) => value === 'bundle' ? t('完整体验', 'Complete') : value === 'extension' ? t('扩展', 'Extension') : t('手机通知', 'Mobile');
-  const available = !preview && product !== 'extension' && purchaseAllowed(config, plan);
+  const available = !preview && purchaseAllowed(config, plan);
 
   function select(value: Product) { setSelected(value); }
   function keyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {

@@ -6,9 +6,11 @@ import { useLocale } from './LocaleProvider';
 import { useSiteConfig } from './SiteConfigProvider';
 import { purchaseAllowed } from '@/lib/site-config';
 import type { PlanCode } from '@/lib/plans';
+import { isHitPaySandboxCheckoutURL } from '@/lib/hitpay-checkout-url';
 
 const hitPayPlans = {
   bundle: 'bundle',
+  extension: 'extension',
   mobile_notification: 'semester',
   mobile_notification_yearly: 'yearly',
 } as const;
@@ -30,13 +32,11 @@ export function BuyButton({
   const emailId = `${formId}-email`;
   const errorId = `${formId}-error`;
   const dialogTitleId = `${formId}-title`;
-  const canonicalPlan = plan === 'extension' ? null : hitPayPlans[plan];
-  const available = !preview && !!canonicalPlan && purchaseAllowed(config, plan);
+  const canonicalPlan = hitPayPlans[plan];
+  const available = !preview && purchaseAllowed(config, plan);
   const unavailableMessage = preview
     ? t('预览模式无法结账', 'Checkout is disabled in preview')
-    : !canonicalPlan
-      ? t('扩展单独购买暂不可用，请选择完整体验包。', 'Standalone extension checkout is unavailable. Choose the complete bundle.')
-      : t('此方案暂不可购买', 'This package is currently unavailable');
+    : t('此方案暂不可购买', 'This package is currently unavailable');
 
   useEffect(() => {
     if (!open || !available) return;
@@ -111,9 +111,7 @@ export function BuyButton({
       if (typeof result?.url !== 'string' || typeof result.reference !== 'string' || !result.reference) {
         throw new Error('INVALID_CHECKOUT_RESPONSE');
       }
-      const url = new URL(result.url);
-      if (url.protocol !== 'https:' || url.hostname !== 'securecheckout.sandbox.hit-pay.com' ||
-          url.port || url.username || url.password) throw new Error('INVALID_CHECKOUT_URL');
+      if (!isHitPaySandboxCheckoutURL(result.url)) throw new Error('INVALID_CHECKOUT_URL');
       window.location.assign(result.url);
       redirecting = true;
     } catch {
@@ -136,11 +134,9 @@ export function BuyButton({
           setError(''); setOpen(true);
         }}
         title={!available ? unavailableMessage : undefined}
-        aria-describedby={!available && !canonicalPlan ? errorId : undefined}
       >
         {children}<span aria-hidden="true">↗</span>
       </button>
-      {!canonicalPlan && <p id={errorId} className="notice">{unavailableMessage}</p>}
 
       {open && available && createPortal(
         <div

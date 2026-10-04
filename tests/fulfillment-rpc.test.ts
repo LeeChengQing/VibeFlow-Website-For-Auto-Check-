@@ -28,6 +28,7 @@ async function database() {
     `);
     await db.exec(readFileSync('supabase/migrations/20261004032804_commerce_and_inventory.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/20261004040308_create_fulfillment_rpc.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/20261004115610_enable_extension_checkout.sql', 'utf8'));
     fulfillmentDb = db;
     return db;
   } catch (error) { await db.close(); throw error; }
@@ -83,10 +84,10 @@ test('fulfillment assigns exactly one matching key, copies order ownership, reco
   const db = await database();
   try {
     await db.exec('set role service_role');
-    for (const [index, plan] of ['bundle', 'semester', 'yearly', 'internal_check'].entries()) {
+    for (const [index, plan] of ['bundle', 'semester', 'yearly', 'internal_check', 'extension'].entries()) {
       const id = await order(db, `ORDER-${plan}`, plan);
-      await stock(db, String(index + 1).repeat(64), plan);
-      await stock(db, String(index + 5).repeat(64), plan);
+      await stock(db, (index + 1).toString(16).repeat(64), plan);
+      await stock(db, (index + 6).toString(16).repeat(64), plan);
       const licenseId = await assign(db, id);
       const license = (await db.query<{ inventory_id: string; order_id: string; buyer_email: string; plan_type: string; status: string; device_id: null; activated_at: null }>(
         'select inventory_id, order_id, buyer_email, plan_type, status, device_id, activated_at from public.issued_licenses where id=$1', [licenseId]
@@ -128,6 +129,43 @@ test('unknown, cancelled, refunded and inconsistent paid orders cannot consume i
     const before = await snapshot(db);
     await assert.rejects(assign(db, '00000000-0000-4000-8000-000000000001'), /ORDER_NOT_FOUND/);
     assert.deepEqual(await snapshot(db), before);
+  } finally { await db.exec('reset role'); }
+});
+
+test('extension orders cannot consume bundle inventory and the expanded constraints preserve service-only access', async () => {
+  const db = await database();
+  try {
+    await db.exec('set role service_role');
+    const id = await order(db, 'EXTENSION-ORDER', 'extension');
+    const bundleStock = await stock(db, 'a'.repeat(64), 'bundle');
+    await assert.rejects(assign(db, id), /INVENTORY_EXHAUSTED/);
+    const extensionStock = await stock(db, 'b'.repeat(64), 'extension');
+    const licenseId = await assign(db, id);
+    assert.equal((await db.query<{ inventory_id: string }>(
+      'select inventory_id from public.issued_licenses where id=$1', [licenseId]
+    )).rows[0].inventory_id, extensionStock);
+    assert.equal((await db.query<{ status: string }>(
+      'select status from public.key_inventory where id=$1', [bundleStock]
+    )).rows[0].status, 'available');
+    await assert.rejects(order(db, 'INVALID-PLAN', 'unknown'), /orders_plan_check/);
+    await assert.rejects(stock(db, 'c'.repeat(64), 'unknown'), /key_inventory_plan_type_check/);
+    await assert.rejects(db.query("update public.issued_licenses set plan_type='unknown' where id=$1", [licenseId]), /issued_licenses_plan_type_check/);
+    await db.exec('reset role');
+    const before = await snapshot(db);
+    await db.exec(readFileSync('supabase/migrations/20261004115610_enable_extension_checkout.sql', 'utf8'));
+    assert.deepEqual(await snapshot(db), before);
+    const protections = (await db.query<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      "select relrowsecurity, relforcerowsecurity from pg_class where oid in ('public.orders'::regclass, 'public.key_inventory'::regclass, 'public.issued_licenses'::regclass)"
+    )).rows;
+    assert.equal(protections.length, 3);
+    assert.ok(protections.every(row => row.relrowsecurity && row.relforcerowsecurity));
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      for (const table of ['orders', 'key_inventory', 'issued_licenses']) {
+        await assert.rejects(db.query(`select * from public.${table}`), /permission denied/);
+      }
+      await db.exec('reset role');
+    }
   } finally { await db.exec('reset role'); }
 });
 
