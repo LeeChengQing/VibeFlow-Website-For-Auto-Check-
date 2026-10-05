@@ -4,6 +4,7 @@ import { PaymentReturn, type PaymentReturnStatus } from '@/components/PaymentRet
 import { isHitPayUUID } from '@/lib/hitpay';
 import { decryptLicenseKey } from '@/lib/license-key-encryption';
 import { getCommerceDatabase } from '@/lib/supabase/commerce';
+import type { OrderPlanCode } from '@/lib/plans';
 
 export const metadata: Metadata = {
   title: 'Payment confirmation · Auto-Check',
@@ -23,6 +24,7 @@ export default async function SuccessPage({ searchParams }: {
   let licenseKey: string | undefined;
   let licensePlan: 'semester' | 'yearly' | undefined;
   let deliveryUnavailable = false;
+  let receipt: { reference: string; plan: OrderPlanCode; amount: number; maskedEmail: string; paidAt: string; paymentProvider: 'hitpay' | 'stripe' } | undefined;
 
   // Either identifier only locates the order. Payment is confirmed exclusively
   // from the server-side webhook fields, never from browser query parameters.
@@ -32,8 +34,8 @@ export default async function SuccessPage({ searchParams }: {
     try {
       const supabase = getCommerceDatabase();
       let query = supabase.from('orders')
-        .select('id,status,payment_confirmed_at,plan')
-        .eq('payment_provider', 'hitpay');
+        .select('id,reference,status,payment_confirmed_at,plan,amount_minor,buyer_email,payment_provider')
+        .in('payment_provider', ['hitpay', 'stripe']);
       query = isHitPayUUID(orderId)
         ? query.eq('id', orderId)
         : query.eq('provider_request_id', reference!);
@@ -44,6 +46,15 @@ export default async function SuccessPage({ searchParams }: {
       else if (order?.payment_confirmed_at && order.status === 'paid') {
         status = 'success';
         downloadExtension = order.plan === 'extension' || order.plan === 'bundle';
+        const [emailName, emailDomain] = order.buyer_email.split('@');
+        receipt = {
+          reference: order.reference,
+          plan: order.plan as OrderPlanCode,
+          amount: order.amount_minor,
+          maskedEmail: `${emailName.slice(0, 1)}•••••@${emailDomain ?? ''}`,
+          paidAt: order.payment_confirmed_at,
+          paymentProvider: order.payment_provider as 'hitpay' | 'stripe',
+        };
 
         if (order.plan === 'bundle' || order.plan === 'semester' || order.plan === 'yearly') {
           const expectedPlan = order.plan === 'bundle' ? 'semester' : order.plan;
@@ -84,5 +95,5 @@ export default async function SuccessPage({ searchParams }: {
   // Only confirmed entitlements cross the server/client boundary; no buyer email,
   // payment IDs, hashes, ciphertext, database credentials or privileged client do.
   return <PaymentReturn status={status} downloadExtension={downloadExtension}
-    licenseKey={licenseKey} licensePlan={licensePlan} deliveryUnavailable={deliveryUnavailable} />;
+    licenseKey={licenseKey} licensePlan={licensePlan} deliveryUnavailable={deliveryUnavailable} receipt={receipt} />;
 }

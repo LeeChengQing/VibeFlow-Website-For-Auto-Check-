@@ -5,24 +5,39 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { m, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Check, CircleHelp, LoaderCircle } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useLocale } from './LocaleProvider';
+import { getOrderPlanDisplay, isNotificationPlan, type OrderPlanCode } from '@/lib/plans';
+
+const ReceiptTicket = dynamic(() => import('./receipt/ReceiptTicket').then(module => module.ReceiptTicket), {
+  loading: () => <div className="receipt-loading" role="status">Loading your ticket…</div>,
+});
+
+type ConfirmedReceipt = { reference: string; plan: OrderPlanCode; amount: number; maskedEmail: string; paidAt: string; paymentProvider: 'hitpay' | 'stripe' };
 
 export type PaymentReturnStatus = 'success' | 'processing' | 'pending' | 'not_paid' | 'unverified' | 'unavailable';
 
-export function PaymentReturn({ status, downloadExtension = false, licenseKey, licensePlan, deliveryUnavailable = false }: {
+export function PaymentReturn({ status, downloadExtension = false, licenseKey, licensePlan, deliveryUnavailable = false, receipt }: {
   status: PaymentReturnStatus;
   downloadExtension?: boolean;
   licenseKey?: string;
   licensePlan?: 'semester' | 'yearly';
   deliveryUnavailable?: boolean;
+  receipt?: ConfirmedReceipt;
 }) {
   const router = useRouter();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const reducedMotion = useReducedMotion();
   const heading = useRef<HTMLHeadingElement>(null);
   const [copyResult, setCopyResult] = useState<'copied' | 'failed' | null>(null);
   const confirmed = status === 'success' || status === 'processing';
   const checking = ['pending', 'processing', 'unavailable'].includes(status);
+  const receiptPlan = receipt ? getOrderPlanDisplay(receipt.plan, locale) : null;
+  const includedItems = !receipt || !receiptPlan ? [] : receipt.plan === 'bundle'
+    ? [t('课程签到浏览器扩展 · 一次买断', 'Class check-in browser extension · one-time'), t('手机通知服务 · 首学期已包含', 'Mobile notifications · first semester included')]
+    : isNotificationPlan(receipt.plan)
+      ? [receiptPlan.period ? `${receiptPlan.name} · ${receiptPlan.period}` : receiptPlan.name]
+      : [t('Chrome 扩展 ZIP 安装包', 'Chrome extension ZIP package')];
 
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -51,7 +66,7 @@ export function PaymentReturn({ status, downloadExtension = false, licenseKey, l
     : status === 'processing'
       ? t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.')
       : status === 'pending'
-        ? t('我们正在等待 HitPay 的安全付款确认。请勿重复付款。', 'We are waiting for secure payment confirmation from HitPay. Please do not pay again.')
+        ? t('我们正在等待支付服务的安全付款确认。请勿重复付款。', 'We are waiting for secure confirmation from the payment provider. Please do not pay again.')
         : status === 'not_paid'
           ? t('此订单未显示为已付款。如您已被扣款，请联系支持。', 'This order is not marked as paid. Contact support if you were charged.')
           : t('目前无法确认此付款。如您已付款，请联系支持，勿重复付款。', 'We could not confirm this payment yet. If you have paid, contact support rather than paying again.');
@@ -95,6 +110,14 @@ export function PaymentReturn({ status, downloadExtension = false, licenseKey, l
           <p className="mt-4 text-sm leading-7 text-white/60">{description}</p>
         </div>
         <div className="my-8 h-px bg-white/10" aria-hidden="true" />
+        {status === 'success' && receipt && <div className="mx-auto mb-8 w-full max-w-xl text-left">
+          <ReceiptTicket order={{ reference: receipt.reference, plan: receipt.plan, amount: receipt.amount, paidAt: receipt.paidAt }}
+            includedItems={includedItems} error="" onOpenSupport={`/support?reference=${encodeURIComponent(receipt.reference)}`}
+            onRefresh={() => router.refresh()} refreshing={false} localTest={false}
+            paymentLabel={receipt.paymentProvider === 'hitpay' ? t('HitPay 沙盒', 'HitPay sandbox') : 'Stripe'}
+            venue={receipt.paymentProvider === 'hitpay' ? t('HitPay 沙盒付款', 'HITPAY SANDBOX PAYMENT') : t('Stripe 付款', 'STRIPE PAYMENT')}
+            maskedEmail={receipt.maskedEmail} />
+        </div>}
         {licenseKey && status === 'success' && <div className="mb-6 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-5 py-5 text-left">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/75">
             {licensePlan === 'yearly' ? t('年度手机通知许可证密钥', 'Yearly notification license key') : t('学期手机通知许可证密钥', 'Semester notification license key')}
