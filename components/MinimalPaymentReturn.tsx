@@ -4,12 +4,13 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, CircleHelp, LoaderCircle } from 'lucide-react';
 import { useLocale } from './LocaleProvider';
+import { PaymentFailure } from './PaymentFailure';
 import type { PaymentReturnStatus } from './PaymentReturn';
 
 export function MinimalPaymentReturn({ status }: { status: PaymentReturnStatus }) {
   const router = useRouter();
   const { t } = useLocale();
-  const checking = ['pending', 'processing', 'unavailable'].includes(status);
+  const checking = status === 'processing';
   const paid = status === 'success';
 
   useEffect(() => {
@@ -17,6 +18,8 @@ export function MinimalPaymentReturn({ status }: { status: PaymentReturnStatus }
     const interval = window.setInterval(() => router.refresh(), 2000);
     return () => window.clearInterval(interval);
   }, [checking, router]);
+
+  if (!paid && !checking) return <PaymentFailure compact />;
 
   function closeOrGoBack() {
     window.close();
@@ -37,10 +40,11 @@ export function MinimalPaymentReturn({ status }: { status: PaymentReturnStatus }
       </div>
       <h1 className="text-2xl font-semibold tracking-tight">
         {paid ? t('付款成功', 'Payment Successful')
-          : status === 'pending' || status === 'processing'
-            ? t('正在确认付款…', 'Confirming your payment…')
-            : t('付款确认', 'Payment confirmation')}
+          : t('已收到付款', 'Payment received')}
       </h1>
+      {checking && <p className="mt-4 text-base leading-7 text-white/70">
+        {t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.')}
+      </p>}
       <button type="button" onClick={closeOrGoBack} className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-[#111317] transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
         {t('关闭 / 返回应用', 'Close / Back to App')}
       </button>

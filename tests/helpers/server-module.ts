@@ -14,7 +14,8 @@ export function loadServerModule<T>(
   const localRequire = createRequire(filename);
   const module = { exports: {} };
   const compiled = transformSync(readFileSync(filename, 'utf8'), {
-    loader: 'ts', format: 'cjs', target: 'es2022', sourcefile: filename,
+    loader: filename.endsWith('.tsx') ? 'tsx' : 'ts', jsx: 'automatic',
+    format: 'cjs', target: 'es2022', sourcefile: filename,
   }).code;
   runInNewContext(compiled, {
     module, exports: module.exports, Buffer, URL, fetch, process,

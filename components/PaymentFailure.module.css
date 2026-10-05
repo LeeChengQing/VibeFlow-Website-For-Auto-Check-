@@ -1,0 +1,26 @@
+.brand { margin-bottom: 12px; }
+.description { margin-top: 16px; font-size: 16px; line-height: 1.75; }
+.warningText { font-size: 16px; line-height: 1.75; }
+.recheck {
+  background: #fff;
+  color: #111317;
+  border: 0;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+}
+.recheck:hover { background: #f0f0f0; }
+.recheck:disabled { cursor: wait; opacity: .6; }
+.home { color: #fff; font-size: 16px; font-weight: 600; text-decoration: none; }
+.support { margin-top: 24px; }
+.supportLink {
+  color: #b7b8ba;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.supportLink:hover { color: #fff; }
+.recheck:focus-visible, .home:focus-visible, .supportLink:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}

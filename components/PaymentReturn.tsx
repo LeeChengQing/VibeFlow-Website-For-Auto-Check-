@@ -7,6 +7,7 @@ import { m, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Check, CircleHelp, LoaderCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useLocale } from './LocaleProvider';
+import { PaymentFailure } from './PaymentFailure';
 import { getOrderPlanDisplay, isNotificationPlan, type OrderPlanCode } from '@/lib/plans';
 
 const ReceiptTicket = dynamic(() => import('./receipt/ReceiptTicket').then(module => module.ReceiptTicket), {
@@ -31,7 +32,7 @@ export function PaymentReturn({ status, downloadExtension = false, licenseKey, l
   const heading = useRef<HTMLHeadingElement>(null);
   const [copyResult, setCopyResult] = useState<'copied' | 'failed' | null>(null);
   const confirmed = status === 'success' || status === 'processing';
-  const checking = ['pending', 'processing', 'unavailable'].includes(status);
+  const checking = status === 'processing';
   const receiptPlan = receipt ? getOrderPlanDisplay(receipt.plan, locale) : null;
   const includedItems = !receipt || !receiptPlan ? [] : receipt.plan === 'bundle'
     ? [t('课程签到浏览器扩展 · 一次买断', 'Class check-in browser extension · one-time'), t('手机通知服务 · 首学期已包含', 'Mobile notifications · first semester included')]
@@ -49,27 +50,19 @@ export function PaymentReturn({ status, downloadExtension = false, licenseKey, l
     return () => window.clearInterval(interval);
   }, [checking, router]);
 
+  // A pending order is not proof of payment, including after cancellation.
+  // Keep its record unchanged so a delayed verified webhook can still fulfill it.
+  if (!confirmed) return <PaymentFailure />;
+
   const title = status === 'success'
     ? t('付款成功！', 'Payment Successful!')
-    : status === 'processing'
-      ? t('已收到付款', 'Payment received')
-      : status === 'pending'
-        ? t('正在确认付款…', 'Confirming your payment...')
-        : status === 'not_paid'
-          ? t('付款未完成', 'Payment is not complete')
-          : t('付款确认', 'Payment confirmation');
+    : t('已收到付款', 'Payment received');
 
   const description = status === 'success'
     ? deliveryUnavailable
       ? t('付款已确认，但许可证暂时无法显示。请联系支持。', 'Your payment is confirmed, but the license could not be displayed. Please contact support.')
       : t('付款已确认。', 'Your payment is confirmed.')
-    : status === 'processing'
-      ? t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.')
-      : status === 'pending'
-        ? t('我们正在等待支付服务的安全付款确认。请勿重复付款。', 'We are waiting for secure confirmation from the payment provider. Please do not pay again.')
-        : status === 'not_paid'
-          ? t('此订单未显示为已付款。如您已被扣款，请联系支持。', 'This order is not marked as paid. Contact support if you were charged.')
-          : t('目前无法确认此付款。如您已付款，请联系支持，勿重复付款。', 'We could not confirm this payment yet. If you have paid, contact support rather than paying again.');
+    : t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.');
 
   function getDownloadUrl() {
     return new URL('/downloads/auto-check-extension.zip', window.location.origin).href;
