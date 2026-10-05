@@ -64,8 +64,8 @@ class ToyyibPayProviderError extends Error {
 
 function responseMessage(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const message = (value as Record<string, unknown>).message;
-  return typeof message === 'string' ? message : null;
+  const { message, msg } = value as Record<string, unknown>;
+  return typeof message === 'string' ? message : typeof msg === 'string' ? msg : null;
 }
 
 function createBillResponseDiagnostic(rawResult: string, responseBytes: number, gatewayResponse: Response, parsed: boolean, result: unknown) {
@@ -189,7 +189,8 @@ export async function POST(request: Request) {
       billName: billNames[plan],
       billDescription: `Auto Check ${plan} License`,
       billPriceSetting: '1',
-      billPayorInfo: '1',
+      // The storefront collects only email, not a prefilled payer name or phone.
+      billPayorInfo: '0',
       billAmount: String(amountMinor),
       billReturnUrl: returnUrl.href,
       billCallbackUrl: new URL('/api/webhook/toyyibpay', origin).href,

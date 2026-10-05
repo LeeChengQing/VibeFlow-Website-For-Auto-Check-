@@ -11,7 +11,7 @@ const env = {
   TOYYIBPAY_CATEGORY_CODE: 'fake_category',
 };
 
-function fixture(options: { providerFail?: boolean; providerBody?: string; contentType?: string; env?: Partial<typeof env> } = {}) {
+function fixture(options: { providerFail?: boolean; providerBody?: string; contentType?: string; validatePayorInfo?: boolean; env?: Partial<typeof env> } = {}) {
   assert.ok(existsSync('app/api/checkout/toyyibpay/route.ts'));
   const calls: unknown[] = [];
   const logs: unknown[][] = [];
@@ -35,8 +35,17 @@ function fixture(options: { providerFail?: boolean; providerBody?: string; conte
     Request, Response, AbortSignal, URLSearchParams,
     process: { env: { ...env, ...options.env } },
     console: { error: (...args: unknown[]) => logs.push(args) },
-    fetch: async () => {
+    fetch: async (_input: unknown, init: RequestInit) => {
       calls.push(true);
+      const fields = new URLSearchParams(String(init.body));
+      if (options.validatePayorInfo && fields.get('billPayorInfo') === '1') {
+        const missingField = ['billTo', 'billPhone'].find(field => !fields.get(field));
+        if (missingField) {
+          return new Response(JSON.stringify({ status: 'error', msg: `${missingField} parameter is empty` }), {
+            status: 200, headers: { 'Content-Type': 'text/html; charset=UTF-8' },
+          });
+        }
+      }
       const body = options.providerBody ?? (options.providerFail
         ? JSON.stringify({ message: 'private provider URL https://evil.example and secret toyyib_fake_secret_value' })
         : JSON.stringify([{ BillCode: 'bill_fixture' }]));
@@ -60,6 +69,30 @@ function fixture(options: { providerFail?: boolean; providerBody?: string; conte
     })),
   };
 }
+
+test('ToyyibPay creates an open bill for every plan using only the storefront email', async () => {
+  for (const plan of ['bundle', 'extension', 'semester', 'yearly']) {
+    const f = fixture({ validatePayorInfo: true });
+    const response = await f.pay({ plan, buyer_email: 'a@b.com' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { url: 'https://toyyibpay.com/bill_fixture', reference: orderId });
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.logs.length, 0);
+  }
+});
+
+test('ToyyibPay reports a provider msg without changing the browser error response', async () => {
+  const f = fixture({
+    providerBody: '{"status":"error","msg":"billTo parameter is empty"}',
+    contentType: 'text/html; charset=UTF-8',
+  });
+  const response = await f.pay({ plan: 'bundle', buyer_email: 'a@b.com' });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: 'TOYYIBPAY_PROVIDER_REJECTED' });
+  const diag = JSON.parse(String(f.logs[0][1]));
+  assert.equal(diag.stage, 'createBill.response_validation');
+  assert.equal(diag.message, 'billTo parameter is empty');
+});
 
 test('ToyyibPay provider diagnostics preserve the response and redact secrets and URLs', async () => {
   const f = fixture({ providerFail: true });
@@ -122,6 +155,7 @@ test('ToyyibPay validation logs response shape and redacted preview for provider
   assert.equal(diag.jsonParsable, true);
   assert.equal(diag.topLevelType, 'object');
   assert.deepEqual(Array.from(diag.topLevelKeys), ['status', 'msg']);
+  assert.equal(diag.message, '[redacted-secret] [redacted-category] [redacted-email] [redacted-url]');
   assert.match(diag.responsePrefix, /redacted-secret|redacted-category/);
   const text = JSON.stringify(f.logs);
   assert.doesNotMatch(text, /toyyib_fake_secret_value|fake_category|a@b\.com|https:\/\/evil\.example|https:\/\/auto-check\.example/);
