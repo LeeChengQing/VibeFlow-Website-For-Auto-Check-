@@ -15,6 +15,58 @@ const billNames = {
   semester: 'Auto Check Semester', yearly: 'Auto Check Yearly',
 } as const;
 
+type DiagnosticStatus = 'missing' | 'empty' | 'set' | 'invalid';
+type DiagnosticError = Error & { diagnosticCode?: string };
+
+function envStatus(value: string | undefined): DiagnosticStatus {
+  if (value === undefined) return 'missing';
+  return value.trim() ? 'set' : 'empty';
+}
+
+function configSnapshot(appUrlStatus?: DiagnosticStatus) {
+  return {
+    APP_URL: appUrlStatus ?? envStatus(process.env.APP_URL),
+    TOYYIBPAY_SECRET_KEY: envStatus(process.env.TOYYIBPAY_SECRET_KEY),
+    TOYYIBPAY_CATEGORY_CODE: envStatus(process.env.TOYYIBPAY_CATEGORY_CODE),
+    STRIPE_SECRET_KEY: envStatus(process.env.STRIPE_SECRET_KEY),
+    STRIPE_WEBHOOK_SECRET: envStatus(process.env.STRIPE_WEBHOOK_SECRET),
+  } satisfies Record<string, DiagnosticStatus>;
+}
+
+function configError(reasonCode: string) {
+  const error = new Error('TOYYIBPAY_NOT_CONFIGURED') as DiagnosticError;
+  error.diagnosticCode = reasonCode;
+  return error;
+}
+
+function logConfig(reasonCode: string, appUrlInvalidFields: string[] = []) {
+  console.error('[checkout-diag]', JSON.stringify({
+    provider: 'toyyibpay', event: 'configuration', reasonCode,
+    config: configSnapshot(appUrlInvalidFields.length ? 'invalid' : undefined),
+    ...(appUrlInvalidFields.length ? { APP_URL_invalidFields: appUrlInvalidFields } : {}),
+  }));
+}
+
+function redactLogText(value: unknown) {
+  if (value === undefined || value === null) return null;
+  const secret = process.env.TOYYIBPAY_SECRET_KEY;
+  const category = process.env.TOYYIBPAY_CATEGORY_CODE;
+  return String(value).replace(secret || /$^/g, '[redacted-secret]').replace(category || /$^/g, '[redacted-category]')
+    .replace(/https?:\/\/[^\s]+/gi, '[redacted-url]').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]');
+}
+
+class ToyyibPayProviderError extends Error {
+  constructor(public readonly code: string, public readonly stage: string, public readonly statusCode: number | null, public readonly providerMessage: unknown) {
+    super(code);
+  }
+}
+
+function responseMessage(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const message = (value as Record<string, unknown>).message;
+  return typeof message === 'string' ? message : null;
+}
+
 function response(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
@@ -22,14 +74,26 @@ function response(body: Record<string, unknown>, status = 200) {
 function checkoutOrigin(request: Request) {
   const requestOrigin = new URL(request.url).origin;
   const configured = process.env.APP_URL?.trim();
-  if (!configured && process.env.NODE_ENV === 'production') throw new Error('TOYYIBPAY_NOT_CONFIGURED');
+  if (!configured && process.env.NODE_ENV === 'production') {
+    logConfig(envStatus(process.env.APP_URL) === 'missing' ? 'APP_URL_MISSING' : 'APP_URL_EMPTY');
+    throw configError(envStatus(process.env.APP_URL) === 'missing' ? 'APP_URL_MISSING' : 'APP_URL_EMPTY');
+  }
   let origin: URL;
   try { origin = new URL(configured || requestOrigin); }
-  catch { throw new Error('TOYYIBPAY_NOT_CONFIGURED'); }
+  catch { logConfig('APP_URL_INVALID', ['protocol', 'hostname']); throw configError('APP_URL_INVALID'); }
   const local = process.env.NODE_ENV !== 'production' && origin.protocol === 'http:' &&
     ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
   if ((!local && origin.protocol !== 'https:') || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== '/') {
-    throw new Error('TOYYIBPAY_NOT_CONFIGURED');
+    const invalidFields = [
+      ...((!local && origin.protocol !== 'https:') ? ['protocol'] : []),
+      ...(!origin.hostname ? ['hostname'] : []),
+      ...((origin.username || origin.password) ? ['username/password'] : []),
+      ...(origin.pathname !== '/' ? ['path'] : []),
+      ...(origin.search ? ['query parameters'] : []),
+      ...(origin.hash ? ['fragment'] : []),
+    ];
+    logConfig('APP_URL_INVALID', invalidFields);
+    throw configError('APP_URL_INVALID');
   }
   if (request.headers.get('origin') !== origin.origin) throw Object.assign(new Error('INVALID_ORIGIN'), { status: 403 });
   return origin.origin;
@@ -67,7 +131,14 @@ export async function POST(request: Request) {
     const origin = checkoutOrigin(request);
     const secret = process.env.TOYYIBPAY_SECRET_KEY?.trim();
     const category = process.env.TOYYIBPAY_CATEGORY_CODE?.trim();
-    if (!secret || !category) throw new Error('TOYYIBPAY_NOT_CONFIGURED');
+    if (!secret) {
+      logConfig(envStatus(process.env.TOYYIBPAY_SECRET_KEY) === 'missing' ? 'TOYYIBPAY_SECRET_MISSING' : 'TOYYIBPAY_SECRET_EMPTY');
+      throw configError(envStatus(process.env.TOYYIBPAY_SECRET_KEY) === 'missing' ? 'TOYYIBPAY_SECRET_MISSING' : 'TOYYIBPAY_SECRET_EMPTY');
+    }
+    if (!category) {
+      logConfig(envStatus(process.env.TOYYIBPAY_CATEGORY_CODE) === 'missing' ? 'TOYYIBPAY_CATEGORY_MISSING' : 'TOYYIBPAY_CATEGORY_EMPTY');
+      throw configError(envStatus(process.env.TOYYIBPAY_CATEGORY_CODE) === 'missing' ? 'TOYYIBPAY_CATEGORY_MISSING' : 'TOYYIBPAY_CATEGORY_EMPTY');
+    }
 
     const body = await readJSON(request);
     if (typeof body.plan !== 'string' || !Object.hasOwn(publicPlans, body.plan) || typeof body.buyer_email !== 'string') {
@@ -110,20 +181,29 @@ export async function POST(request: Request) {
       chargeDuitNowQR: '0',
     });
 
-    const gatewayResponse = await fetch('https://toyyibpay.com/index.php/api/createBill', {
-      method: 'POST', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15_000),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: fields.toString(),
-    });
+    let gatewayResponse: Response;
+    try {
+      gatewayResponse = await fetch('https://toyyibpay.com/index.php/api/createBill', {
+        method: 'POST', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15_000),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        body: fields.toString(),
+      });
+    } catch (error) {
+      throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_UNAVAILABLE', 'createBill.request', null, error instanceof Error ? error.message : null);
+    }
     const rawResult = await gatewayResponse.text();
-    if (!gatewayResponse.ok || rawResult.length > 65_536) throw new Error('TOYYIBPAY_PROVIDER_UNAVAILABLE');
+    let parsedMessage: string | null = null;
+    try { parsedMessage = responseMessage(JSON.parse(rawResult)); } catch { /* diagnostic message unavailable */ }
+    if (!gatewayResponse.ok || rawResult.length > 65_536) {
+      throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_UNAVAILABLE', 'createBill.response', gatewayResponse.status, parsedMessage);
+    }
 
     let result: unknown;
-    try { result = JSON.parse(rawResult); } catch { throw new Error('TOYYIBPAY_PROVIDER_REJECTED'); }
+    try { result = JSON.parse(rawResult); } catch { throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_REJECTED', 'createBill.response_parse', gatewayResponse.status, null); }
     const bill = Array.isArray(result) ? result[0] : result;
     const billCode = bill && typeof bill === 'object' ? (bill as Record<string, unknown>).BillCode : undefined;
     if (typeof billCode !== 'string' || !/^[A-Za-z0-9_-]{2,64}$/.test(billCode)) {
-      throw new Error('TOYYIBPAY_PROVIDER_REJECTED');
+      throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_REJECTED', 'createBill.response_validation', gatewayResponse.status, responseMessage(bill));
     }
 
     const { data: saved, error: saveError } = await supabase.from('orders')
@@ -141,7 +221,15 @@ export async function POST(request: Request) {
                 : error instanceof Error && error.message === 'ORDER_INSERT_FAILED' ? 500
                   : error instanceof Error && error.message === 'ORDER_SAVE_FAILED' ? 500 : 500;
     const code = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'CHECKOUT_FAILED';
-    if (status >= 500) console.error('TOYYIBPAY_CHECKOUT_FAILED', code);
+    if (error instanceof ToyyibPayProviderError) {
+      console.error('[checkout-diag]', JSON.stringify({ provider: 'toyyibpay', event: 'provider_error', stage: error.stage,
+        statusCode: error.statusCode, message: redactLogText(error.providerMessage), environment: 'production' }));
+    } else if (status >= 500) {
+      const diagnosticCode = error instanceof Error && 'diagnosticCode' in error ? (error as DiagnosticError).diagnosticCode : code;
+      if (diagnosticCode && !(error instanceof Error && 'diagnosticCode' in error)) {
+        console.error('[checkout-diag]', JSON.stringify({ provider: 'toyyibpay', event: 'checkout_failure', reasonCode: diagnosticCode, config: configSnapshot() }));
+      }
+    }
     return response({ error: code }, status);
   }
 }

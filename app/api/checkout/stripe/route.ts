@@ -16,6 +16,7 @@ const productNames = {
 };
 
 export async function POST(request: Request) {
+  let apiCall = 'unknown';
   try {
     const origin = checkoutOrigin(request);
     if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') {
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
       currency: 'MYR', status: 'pending', payment_provider: 'stripe',
     });
     if (insertError) throw new Error('ORDER_INSERT_FAILED');
+    apiCall = 'checkout.sessions.create';
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', allowed_payment_method_types: ['card', 'fpx'], customer_email: email,
       client_reference_id: reference, metadata: { order_id: reference },
@@ -55,10 +57,11 @@ export async function POST(request: Request) {
       } }],
       success_url: `${origin}/success?order_id=${reference}`, cancel_url: `${origin}/#pricing`,
     }, { idempotencyKey: `checkout-${reference}` });
+    apiCall = 'unknown';
     if (!session.id || !isPaymentCheckoutURL(session.url, 'stripe')) throw new Error('INVALID_CHECKOUT_RESPONSE');
     const { error: saveError } = await supabase.from('orders').update({ provider_request_id: session.id })
       .eq('id', reference).eq('status', 'pending');
     if (saveError) throw new Error('ORDER_SAVE_FAILED');
     return stripeResponse({ url: session.url, reference });
-  } catch (error) { return stripeErrorResponse(error); }
+  } catch (error) { return stripeErrorResponse(error, apiCall); }
 }

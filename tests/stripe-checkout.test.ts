@@ -14,6 +14,7 @@ const env = { STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: secre
 function fixture(options: { config?: typeof DEFAULT_SITE_CONFIG; providerFail?: boolean; env?: Partial<typeof env>; amount?: number; rpcError?: string; dbError?: boolean } = {}) {
   assert.ok(existsSync('app/api/checkout/stripe/route.ts'), 'Stripe session endpoint is missing');
   const calls: any[] = [];
+  const logs: unknown[][] = [];
   let row: any = null;
   const db = {
     from: () => {
@@ -53,7 +54,7 @@ function fixture(options: { config?: typeof DEFAULT_SITE_CONFIG; providerFail?: 
   };
   const server = loadServerModule<any>('lib/stripe-server.ts', {
     stripe: class { constructor() { return stripe; } },
-  }, { Request, Response, AbortSignal, process: { env: { ...env, ...options.env } }, console: { error: () => {} } });
+  }, { Request, Response, AbortSignal, process: { env: { ...env, ...options.env } }, console: { error: (...args: unknown[]) => logs.push(args) } });
   const fulfillment = loadServerModule<any>('lib/stripe-fulfillment.ts', {
     '@/lib/supabase/commerce': { getCommerceDatabase: () => db },
     '@/lib/stripe-server': server,
@@ -68,11 +69,11 @@ function fixture(options: { config?: typeof DEFAULT_SITE_CONFIG; providerFail?: 
     '@/lib/site-config': { packagePrice, purchaseAllowed },
     '@/lib/supabase/commerce': { getCommerceDatabase: () => db },
   };
-  const globals = { Request, Response, AbortSignal, process: { env: { ...env, ...options.env } }, console: { error: () => {} } };
+  const globals = { Request, Response, AbortSignal, process: { env: { ...env, ...options.env } }, console: { error: (...args: unknown[]) => logs.push(args) } };
   const route = loadServerModule<any>('app/api/checkout/stripe/route.ts', deps, globals);
   const webhook = loadServerModule<any>('app/api/checkout/stripe/webhook/route.ts', deps, globals);
   return {
-    calls, get row() { return row; },
+    calls, logs, get row() { return row; },
     pay: (body: unknown, origin = 'https://auto-check.example') => route.POST(new Request('https://auto-check.example/api/checkout/stripe', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body),
     })),
@@ -132,6 +133,30 @@ test('provider and database failures do not return private details or a payment 
     const f = fixture(options); const response = await f.pay({ plan: 'bundle', buyer_email: 'a@b.com' });
     assert.ok(response.status >= 500); assert.doesNotMatch(await response.text(), /private|credentials|https:/);
   }
+});
+
+test('Stripe provider diagnostics are structured and redact secrets and URLs', async () => {
+  const f = fixture({ providerFail: true, env: { STRIPE_SECRET_KEY: 'sk_test_fake_secret_value' } });
+  const response = await f.pay({ plan: 'bundle', buyer_email: 'a@b.com' });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: 'PAYMENT_PROVIDER_UNAVAILABLE' });
+  const log = f.logs.find(args => JSON.stringify(args).includes('[checkout-diag]'));
+  assert.ok(log);
+  const text = JSON.stringify(log);
+  assert.match(text, /checkout\.sessions\.create/);
+  assert.match(text, /sk_test_/);
+  assert.doesNotMatch(text, /sk_test_fake_secret_value|https:\/\/checkout\.stripe\.com/);
+  assert.doesNotMatch(text, /a@b\.com/);
+});
+
+test('Stripe configuration diagnostics preserve the existing response', async () => {
+  const f = fixture({ env: { STRIPE_SECRET_KEY: '' } });
+  const response = await f.pay({ plan: 'bundle', buyer_email: 'a@b.com' });
+  assert.equal(response.status, 503, JSON.stringify(f.logs));
+  assert.deepEqual(await response.json(), { error: 'STRIPE_NOT_CONFIGURED' });
+  const text = JSON.stringify(f.logs);
+  assert.match(text, /STRIPE_SECRET_EMPTY/);
+  assert.doesNotMatch(text, /sk_test_fake_secret_value|https:\/\/auto-check\.example|a@b\.com/);
 });
 
 test('Stripe signatures and exact payment amounts are verified before fulfillment', async () => {
