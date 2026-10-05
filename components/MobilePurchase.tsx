@@ -27,14 +27,14 @@ export function MobileFinalPurchase() {
   return <button type="button" className="mobile-only mobile-final-purchase button primary" onClick={event => action.current?.(event.currentTarget)}>{t('继续购买所选方案', 'Get your selected plan')} <span aria-hidden>↗</span></button>;
 }
 
-export function MobilePurchase() {
+export function MobilePurchase({ initialProduct = 'bundle' }: { initialProduct?: Product }) {
   const { t, locale } = useLocale();
   const { config, preview } = useSiteConfig();
   const pricing = useMobilePricing();
   const active = useOfferActive();
   const { billingPlan, setBillingPlan } = useNotificationBilling();
   const shouldReduceMotion = useReducedMotion();
-  const [selected, setSelected] = useState<Product>('bundle');
+  const [selected, setSelected] = useState<Product>(initialProduct);
   const [viewPlans, setViewPlans] = useState(false);
   const [sticky, setSticky] = useState(false);
   const action = useContext(ActionContext);

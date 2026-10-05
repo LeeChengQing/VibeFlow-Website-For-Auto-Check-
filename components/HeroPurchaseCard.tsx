@@ -51,11 +51,11 @@ function BundleUrgency({ expanded }: { expanded: boolean }) {
   </>;
 }
 
-export function HeroPurchaseCard() {
+export function HeroPurchaseCard({ initialProduct = 'bundle' }: { initialProduct?: Product }) {
   const { t, locale } = useLocale();
   const { config } = useSiteConfig();
   const offerActive = useOfferActive();
-  const [selected, setSelectedProduct] = useState<Product>('bundle');
+  const [selected, setSelectedProduct] = useState<Product>(initialProduct);
   const { billingPlan, setBillingPlan } = useNotificationBilling();
   const productRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const checkoutCardRef = useRef<HTMLDivElement>(null);
