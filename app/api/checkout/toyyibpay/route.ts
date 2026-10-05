@@ -52,11 +52,12 @@ function redactLogText(value: unknown) {
   const secret = process.env.TOYYIBPAY_SECRET_KEY;
   const category = process.env.TOYYIBPAY_CATEGORY_CODE;
   return String(value).replace(secret || /$^/g, '[redacted-secret]').replace(category || /$^/g, '[redacted-category]')
-    .replace(/https?:\/\/[^\s]+/gi, '[redacted-url]').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]');
+    .replace(/https?:(?:\\?\/){2}[^\s"']+/gi, '[redacted-url]').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]');
 }
 
 class ToyyibPayProviderError extends Error {
-  constructor(public readonly code: string, public readonly stage: string, public readonly statusCode: number | null, public readonly providerMessage: unknown) {
+  constructor(public readonly code: string, public readonly stage: string, public readonly statusCode: number | null,
+    public readonly providerMessage: unknown, public readonly responseDiagnostic?: Record<string, unknown>) {
     super(code);
   }
 }
@@ -65,6 +66,23 @@ function responseMessage(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const message = (value as Record<string, unknown>).message;
   return typeof message === 'string' ? message : null;
+}
+
+function createBillResponseDiagnostic(rawResult: string, responseBytes: number, gatewayResponse: Response, parsed: boolean, result: unknown) {
+  const topLevelType = !parsed ? 'unparsed' : Array.isArray(result) ? 'array' : result === null ? 'null' : typeof result;
+  const keys = parsed && result && typeof result === 'object' && !Array.isArray(result) ? Object.keys(result) : [];
+  const first = Array.isArray(result) ? result[0] : null;
+  const firstItemKeys = first && typeof first === 'object' && !Array.isArray(first) ? Object.keys(first) : [];
+  return {
+    contentType: redactLogText(gatewayResponse.headers.get('content-type')),
+    responseBytes,
+    jsonParsable: parsed,
+    topLevelType,
+    topLevelKeys: keys.slice(0, 20).map(key => redactLogText(key)?.slice(0, 200)),
+    firstItemKeys: firstItemKeys.slice(0, 20).map(key => redactLogText(key)?.slice(0, 200)),
+    responsePrefix: redactLogText(rawResult)?.slice(0, 200),
+    firstCodePoint: rawResult.codePointAt(0) ?? null,
+  };
 }
 
 function response(body: Record<string, unknown>, status = 200) {
@@ -191,19 +209,25 @@ export async function POST(request: Request) {
     } catch (error) {
       throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_UNAVAILABLE', 'createBill.request', null, error instanceof Error ? error.message : null);
     }
-    const rawResult = await gatewayResponse.text();
-    let parsedMessage: string | null = null;
-    try { parsedMessage = responseMessage(JSON.parse(rawResult)); } catch { /* diagnostic message unavailable */ }
+    const rawBytes = Buffer.from(await gatewayResponse.arrayBuffer());
+    const rawResult = rawBytes.toString('utf8');
+    const normalizedResult = rawResult.replace(/^\uFEFF/, '').trim();
+    let result: unknown;
+    let parsed = false;
+    try { result = JSON.parse(normalizedResult); parsed = true; } catch { /* invalid JSON is handled below */ }
+    const parsedMessage = parsed ? responseMessage(result) : null;
     if (!gatewayResponse.ok || rawResult.length > 65_536) {
       throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_UNAVAILABLE', 'createBill.response', gatewayResponse.status, parsedMessage);
     }
-
-    let result: unknown;
-    try { result = JSON.parse(rawResult); } catch { throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_REJECTED', 'createBill.response_parse', gatewayResponse.status, null); }
+    if (!parsed) {
+      throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_REJECTED', 'createBill.response_parse', gatewayResponse.status, null,
+        createBillResponseDiagnostic(rawResult, rawBytes.length, gatewayResponse, false, null));
+    }
     const bill = Array.isArray(result) ? result[0] : result;
     const billCode = bill && typeof bill === 'object' ? (bill as Record<string, unknown>).BillCode : undefined;
     if (typeof billCode !== 'string' || !/^[A-Za-z0-9_-]{2,64}$/.test(billCode)) {
-      throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_REJECTED', 'createBill.response_validation', gatewayResponse.status, responseMessage(bill));
+      throw new ToyyibPayProviderError('TOYYIBPAY_PROVIDER_REJECTED', 'createBill.response_validation', gatewayResponse.status,
+        responseMessage(bill), createBillResponseDiagnostic(rawResult, rawBytes.length, gatewayResponse, true, result));
     }
 
     const { data: saved, error: saveError } = await supabase.from('orders')
@@ -223,7 +247,8 @@ export async function POST(request: Request) {
     const code = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'CHECKOUT_FAILED';
     if (error instanceof ToyyibPayProviderError) {
       console.error('[checkout-diag]', JSON.stringify({ provider: 'toyyibpay', event: 'provider_error', stage: error.stage,
-        statusCode: error.statusCode, message: redactLogText(error.providerMessage), environment: 'production' }));
+        statusCode: error.statusCode, message: redactLogText(error.providerMessage), environment: 'production',
+        ...error.responseDiagnostic }));
     } else if (status >= 500) {
       const diagnosticCode = error instanceof Error && 'diagnosticCode' in error ? (error as DiagnosticError).diagnosticCode : code;
       if (diagnosticCode && !(error instanceof Error && 'diagnosticCode' in error)) {
