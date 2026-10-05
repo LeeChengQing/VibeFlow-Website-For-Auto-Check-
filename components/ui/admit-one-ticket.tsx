@@ -15,6 +15,7 @@ export type AdmitOneTicketProps = {
   width: number;
   shaderEnabled?: boolean;
   animate?: boolean;
+  localTest?: boolean;
 };
 
 function splitName(name: string) {
@@ -47,14 +48,14 @@ class ShaderBoundary extends Component<{ children: ReactNode }, { failed: boolea
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-export function AdmitOneTicket({ name, presenter, event, venue, dates, stubText, watermark, width, shaderEnabled = true, animate = false }: AdmitOneTicketProps) {
+export function AdmitOneTicket({ name, presenter, event, venue, dates, stubText, watermark, width, shaderEnabled = true, animate = false, localTest = true }: AdmitOneTicketProps) {
   const lines = splitName(name);
   return <article className={`${styles.ticket} admit-one-ticket`} data-testid="admit-one-ticket" style={{ '--ticket-width': `${Math.max(320, width)}px`, '--name-size': fitScale(width, lines.length) } as CSSProperties} aria-label={`Admit One ticket for ${event}`}>
     <div className={styles.shaderFallback} aria-hidden="true" />
     {shaderEnabled && <ShaderBoundary><Dithering className={styles.shader} colorBack="#050507" colorFront="#2a2f36" shape="warp" type="random" size={1} speed={animate ? 0.35 : 0} scale={0.9} minPixelRatio={1} maxPixelCount={1_200_000} webGlContextAttributes={{ alpha: true, antialias: false, powerPreference: 'low-power' }} aria-hidden="true" /></ShaderBoundary>}
     <div className={styles.gloss} aria-hidden="true" />
     <div className={styles.content}>
-      <header className={styles.header}><span>{presenter}</span><span className={styles.status}><i />PAID · LOCAL TEST</span></header>
+      <header className={styles.header}><span>{presenter}</span><span className={styles.status}><i />{localTest ? 'PAID · LOCAL TEST' : 'PAID'}</span></header>
       <div className={styles.brandRow}><span className={styles.kicker}>AUTO-CHECK</span><span className={styles.admitLabel}>ADMIT ONE</span></div>
       <h2 className={styles.name}>{lines.map((line, index) => <span key={`${index}-${line}`}>{line}</span>)}</h2>
       <div className={styles.rule} />

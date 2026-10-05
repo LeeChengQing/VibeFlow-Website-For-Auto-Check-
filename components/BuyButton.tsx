@@ -8,9 +8,10 @@ import { useLocale } from './LocaleProvider';
 import { useSiteConfig } from './SiteConfigProvider';
 import { purchaseAllowed } from '@/lib/site-config';
 import type { PlanCode } from '@/lib/plans';
-import { isHitPaySandboxCheckoutURL } from '@/lib/hitpay-checkout-url';
+import { isPaymentCheckoutURL, paymentMethods, type PaymentMethod } from '@/lib/payment-checkout';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
 
-const hitPayPlans = {
+const checkoutPlans = {
   bundle: 'bundle',
   extension: 'extension',
   mobile_notification: 'semester',
@@ -25,10 +26,11 @@ export function BuyButton({
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
   const [error, setError] = useState('');
   const [redirectCountdown, setRedirectCountdown] = useState(3);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [hitpayUrl, setHitpayUrl] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
   const redirectAttempted = useRef(false);
   const submitting = useRef(false);
@@ -39,7 +41,8 @@ export function BuyButton({
   const emailId = `${formId}-email`;
   const errorId = `${formId}-error`;
   const dialogTitleId = `${formId}-title`;
-  const canonicalPlan = hitPayPlans[plan];
+  const canonicalPlan = checkoutPlans[plan];
+  const selectedMethod = paymentMethods.find(method => method.id === paymentMethod)!;
   const available = !preview && purchaseAllowed(config, plan);
   const unavailableMessage = preview
     ? t('预览模式无法结账', 'Checkout is disabled in preview')
@@ -81,7 +84,7 @@ export function BuyButton({
   }, [open, available, isRedirecting]);
 
   useEffect(() => {
-    if (!isRedirecting || !hitpayUrl) return;
+    if (!isRedirecting || !checkoutUrl) return;
     const startedAt = Date.now();
     const interval = window.setInterval(() => {
       const remaining = Math.max(0, 3 - Math.floor((Date.now() - startedAt) / 1000));
@@ -89,21 +92,21 @@ export function BuyButton({
       if (remaining === 0) window.clearInterval(interval);
     }, 1000);
     return () => window.clearInterval(interval);
-  }, [isRedirecting, hitpayUrl]);
+  }, [isRedirecting, checkoutUrl]);
 
   useEffect(() => {
-    if (!isRedirecting || redirectCountdown !== 0 || !hitpayUrl || redirectAttempted.current) return;
+    if (!isRedirecting || redirectCountdown !== 0 || !checkoutUrl || redirectAttempted.current) return;
     redirectAttempted.current = true;
     try {
-      window.location.href = hitpayUrl;
+      window.location.href = checkoutUrl;
     } catch {
       setIsRedirecting(false);
-      setHitpayUrl(null);
+      setCheckoutUrl(null);
       submitting.current = false;
       setBusy(false);
       setError(t('暂时无法打开付款页面，请稍后重试。', 'Could not open checkout. Please try again later.'));
     }
-  }, [isRedirecting, redirectCountdown, hitpayUrl, t]);
+  }, [isRedirecting, redirectCountdown, checkoutUrl, t]);
 
   useEffect(() => {
     // A browser Back navigation may restore the pre-redirect modal from bfcache.
@@ -112,7 +115,7 @@ export function BuyButton({
       redirectAttempted.current = false;
       submitting.current = false;
       setIsRedirecting(false);
-      setHitpayUrl(null);
+      setCheckoutUrl(null);
       setRedirectCountdown(3);
       setBusy(false);
     }
@@ -130,7 +133,7 @@ export function BuyButton({
     if (code === 'INVALID_EMAIL' || code === 'INVALID_CHECKOUT') {
       return t('请输入有效的邮箱地址。', 'Please enter a valid email address.');
     }
-    if (code === 'CHECKOUT_UNAVAILABLE' || code === 'HITPAY_NOT_CONFIGURED' || code === 'INVALID_PRICE') {
+    if (code === 'CHECKOUT_UNAVAILABLE' || code === 'STRIPE_NOT_CONFIGURED' || code === 'TOYYIBPAY_NOT_CONFIGURED' || code === 'INVALID_PRICE') {
       return t('结账暂不可用，请稍后再试。', 'Checkout is currently unavailable. Please try again later.');
     }
     return t('暂时无法打开付款页面，请稍后重试。', 'Could not open checkout. Please try again later.');
@@ -138,14 +141,14 @@ export function BuyButton({
 
   async function buy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!available || submitting.current) return;
+    if (!available || !selectedMethod.enabled || submitting.current) return;
     submitting.current = true;
     setBusy(true);
     setError('');
     let redirecting = false;
 
     try {
-      const response = await fetch('/api/hitpay/checkout', {
+      const response = await fetch(selectedMethod.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ buyer_email: email.trim().toLowerCase(), plan: canonicalPlan }),
@@ -156,12 +159,9 @@ export function BuyButton({
         setError(checkoutError(result?.error));
         return;
       }
-      if (typeof result?.url !== 'string' || typeof result.reference !== 'string' || !result.reference) {
-        throw new Error('INVALID_CHECKOUT_RESPONSE');
-      }
-      if (!isHitPaySandboxCheckoutURL(result.url)) throw new Error('INVALID_CHECKOUT_URL');
+      if (!isPaymentCheckoutURL(result?.url, paymentMethod)) throw new Error('INVALID_CHECKOUT_URL');
       redirectAttempted.current = false;
-      setHitpayUrl(result.url);
+      setCheckoutUrl(result.url);
       setRedirectCountdown(3);
       setIsRedirecting(true);
       redirecting = true;
@@ -214,7 +214,7 @@ export function BuyButton({
                 <p className="text-sm tabular-nums text-white/60" aria-live="polite" aria-atomic="true">
                   {t(`${redirectCountdown} 秒后跳转`, `Redirecting in ${redirectCountdown}s`)}
                 </p>
-                <p className="text-xs text-white/40">{t('由 HitPay 提供安全付款', 'Secure checkout by HitPay')}</p>
+                <p className="text-xs text-white/40">{t(`由 ${selectedMethod.provider} 提供安全付款`, `Secure checkout by ${selectedMethod.provider}`)}</p>
               </m.div>
             ) : <form id={formId} className="form" onSubmit={buy} aria-busy={busy}>
               <h2 id={dialogTitleId} className="text-xl font-semibold">
@@ -231,10 +231,12 @@ export function BuyButton({
                   placeholder="you@example.com"
                 />
               </label>
+              <PaymentMethodSelector value={paymentMethod} disabled={busy} name={`${formId}-payment-method`}
+                onChange={method => { setPaymentMethod(method); setError(''); }} />
               {error && <p id={errorId} className="form-error" role="alert">{error}</p>}
               <button type="submit" className={className} disabled={busy}>
-                {busy ? t('正在打开…', 'Opening…') : t('前往 HitPay 付款', 'Continue to HitPay')}
-                <span aria-hidden="true">↗</span>
+                {busy ? t('正在打开…', 'Opening…') : t(`前往 ${selectedMethod.provider} 付款`, `Continue to ${selectedMethod.provider}`)}
+                {busy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <span aria-hidden="true">↗</span>}
               </button>
               <button type="button" className="button secondary" disabled={busy} onClick={closeModal}>
                 {t('取消', 'Cancel')}

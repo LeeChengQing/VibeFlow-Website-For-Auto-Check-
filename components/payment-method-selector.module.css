@@ -1,0 +1,16 @@
+.group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.legend { margin-bottom: 10px; color: #eee; font-size: 13px; font-weight: 500; }
+.options { display: grid; gap: 10px; }
+.group .card { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid #ffffff26; border-radius: 12px; background: #ffffff03; cursor: pointer; transition: border-color 150ms, background-color 150ms; }
+.group .card:hover { border-color: #ffffff60; }
+.group .selected, .group .selected:hover { border-color: #d7d7dc; background: #ffffff0d; box-shadow: 0 0 0 1px #d7d7dc24; }
+.group .card:has(:focus-visible) { outline: 2px solid white; outline-offset: 3px; }
+.group:disabled .card { cursor: wait; opacity: .6; }
+.group .unavailable, .group .unavailable:hover { cursor: not-allowed; border-color: #ffffff18; background: #ffffff02; }
+.unavailable .title, .unavailable .provider { color: #8b8b96; }
+.availability { width: fit-content; border-radius: 5px; padding: 3px 6px; background: #ffffff09; color: #aaaab2; font-size: 10px; line-height: 1.4; }
+.group .radio { appearance: auto; flex: 0 0 16px; width: 16px; height: 16px; margin: 3px 0 0; padding: 0; accent-color: #d7d7dc; }
+.copy { display: grid; gap: 6px; min-width: 0; }
+.title { color: #eee; font-size: 13px; font-weight: 500; line-height: 1.6; }
+.provider { color: #aaaab2; font-size: 11px; font-weight: 400; line-height: 1.4; }
+@media (prefers-reduced-motion: reduce) { .group .card { transition: none; } }

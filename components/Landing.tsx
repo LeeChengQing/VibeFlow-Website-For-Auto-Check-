@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { displayAmount, price } from '@/lib/plans';
+import { DEFAULT_SITE_CONFIG } from '@/lib/site-config';
 import { useLocale } from './LocaleProvider';
 import { Showcase } from './Showcase';
 import { BuyButton } from './BuyButton';
@@ -33,6 +34,7 @@ function ExtensionPricingCard() {
 export function Landing({children}:{children:ReactNode}){
   const {t,locale,setLocale}=useLocale();const [guide,setGuide]=useState<{src:string;title:string;alt:string}|null>(null);
   const {config,preview}=useSiteConfig();
+  const purchaseNotice=config.content.purchaseNotice[locale];
   const rootRef=useRef<HTMLDivElement>(null);useLandingMotion(rootRef,locale);
   const features=config.content.features.map(item=>[item.title[locale],item.description[locale]]);
   const guides=config.guides.filter(item=>item.visible).sort((a,b)=>a.order-b.order).map(item=>({...item,title:item.title[locale],sub:item.description[locale],alt:item.alt[locale]}));
@@ -50,7 +52,7 @@ export function Landing({children}:{children:ReactNode}){
     <Showcase/>
     <section id="workflow" className="shell section" aria-labelledby="workflow-title"><div className="section-heading"><div><p className="eyebrow">HOW IT WORKS / 01</p><h2 id="workflow-title">{t('开始，其实很简单。','Simple from the start.')}</h2></div><p>{t('选对方案，完成设置，回到你的课程。','Pick your package, get set up, and get back to your classes.')}</p></div><div className="steps">{[
       [t('选择你的方案','Choose your package'),t('选择完整体验包，或单独购买扩展与手机通知。','Choose the complete bundle or buy the extension and notifications separately.')],
-      [t('完成付款','Complete checkout'),t('正式上线后前往 HitPay 安全付款，并填写接收邮箱。','At live checkout, pay securely through HitPay and enter your delivery email.')],
+      [t('完成付款','Complete checkout'),t('填写接收邮箱，通过 Stripe 安全付款。','Enter your delivery email and pay securely through Stripe.')],
       [t('配置，即可开始','Set up and get going'),t('收到 ZIP 链接或通知密钥，跟随下方图文教程设置。','Receive your ZIP link or notification key, then follow the setup guides below.')],
     ].map(([title,description],i)=><article className="step" key={title}><span className="step-number">0{i+1}</span><h3>{title}</h3><p>{description}</p></article>)}</div></section>
     <section id="pricing" className="shell section pricing-section" aria-labelledby="pricing-title">
@@ -58,7 +60,7 @@ export function Landing({children}:{children:ReactNode}){
       <div className="pricing-grid">
         {cards.map(item=>item.id==='bundle'?<BundleOfferCard key={item.id}/>:item.id==='extension'?<ExtensionPricingCard key={item.id}/>:<NotificationPricingCard key="notification"/>)}
       </div>
-      <p className="pricing-note">{config.content.purchaseNotice[locale]}</p>
+      <p className="pricing-note">{purchaseNotice===t('当前为本地测试，不会扣款。','Local test only; no payment is collected.') ? DEFAULT_SITE_CONFIG.content.purchaseNotice[locale] : purchaseNotice}</p>
     </section>
     <section id="product" className="shell section product-section" aria-labelledby="product-title"><div className="section-heading"><div><p className="eyebrow">THE DETAILS / 03</p><h2 id="product-title">{t('少一点重复，','Less repetition.')}<br/><span className="muted">{t('多一点安心。','More peace of mind.')}</span></h2></div><p>{t('从课表导入，到签到结果。每一步都清楚。','From your timetable to your results, every step stays clear.')}</p></div><MagicBento className="product-bento-grid" items={features.map(([title,body],i)=>({id:`feature-${i}`,className:`feature ${i===0||i===5?'bento-wide':''}`,content:<><span className="feature-number">0{i+1}</span><h3>{title}</h3><p>{body}</p>{(i===0||i===5)&&<div className="bento-format-list" aria-hidden="true">{(i===0?['PDF','JPG / JPEG','PNG']:['Windows','macOS','Chrome']).map(label=><span key={label}>{label}</span>)}</div>}</>}))}/><div className="product-workflow"><span>{t('上传课表','Import timetable')}</span><span aria-hidden>→</span><span>{t('绑定入口','Connect form')}</span><span aria-hidden>→</span><span>{t('填写资料','Add details')}</span><span aria-hidden>→</span><span>{t('确认任务','Confirm tasks')}</span><span aria-hidden>→</span><span>{t('执行签到','Check in')}</span></div></section>
     <section className="shell section"><div className="notification-banner"><div><p className="eyebrow">A LITTLE EXTRA PEACE OF MIND</p><h2>{t('结果，在手机上见。','Updates. In your pocket.')}</h2><p>{t('开通手机通知，完成一次 ntfy 设置。执行、成功、失败、错过时间或状态未知，及时掌握。','Add notifications and set up ntfy once. Get execution, success, failure, missed, and unknown-status updates on your phone.')}</p><a className="text-link" href="#tutorials">{t('查看手机配置教程','See the phone setup guides')} ↗</a></div><div className="phone-preview" aria-label={t('通知效果示意','Illustrative notification preview')}><span>9:41</span><div className="phone-notification"><Image src="/files/logo.png" alt="" width="32" height="32" sizes="32px" quality={100}/><div><small>AUTO-CHECK <span>now</span></small><strong>{t('签到成功','Check-in successful')}</strong><p>{t('课程签到已完成。安心上课吧。','Your class check-in is complete.')}</p></div></div><p className="phone-caption">{t('通知示意 · 实际状态以执行结果为准','Illustration · Actual results may vary')}</p></div></div></section>

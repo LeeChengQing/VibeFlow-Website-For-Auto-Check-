@@ -32,7 +32,7 @@ test('mobile decision, selected plan, sticky purchase and checkout stay connecte
   await expect(page.locator('.mobile-sticky-purchase')).not.toBeVisible();
   await purchase.getByRole('radio', { name: 'Extension', exact: true }).click();
   await expect(purchase).toContainText('RM24.99');
-  await expect(purchase.getByRole('button', { name: /Get extension/ })).toBeDisabled();
+  await expect(purchase.getByRole('button', { name: /Get extension/ })).toBeEnabled();
   await purchase.getByRole('radio', { name: 'Mobile', exact: true }).click();
   await expect(purchase).toContainText('From RM11.99');
   await purchase.getByRole('button', { name: 'View notification plans' }).click();
@@ -117,7 +117,7 @@ test('mobile expiry updates all purchase entries and checkout error is recoverab
   await expect(page.locator('.mobile-launch-countdown')).toHaveCount(0);
   await expect(page.locator('.mobile-separate-value').first()).toContainText('RM36.98');
   let body: Record<string, unknown> | undefined;
-  await page.route('**/api/hitpay/checkout', async route => {
+  await page.route('**/api/checkout/stripe', async route => {
     body = route.request().postDataJSON();
     await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'CHECKOUT_UNAVAILABLE' }) });
   });
@@ -125,9 +125,9 @@ test('mobile expiry updates all purchase entries and checkout error is recoverab
   const purchase = page.locator('.mobile-purchase');
   const dialog = page.getByRole('dialog', { name: 'Complete your purchase' });
   await dialog.getByLabel('Delivery email').fill('Mobile-Test@example.com');
-  await dialog.getByRole('button', { name: 'Continue to HitPay' }).click();
+  await dialog.getByRole('button', { name: 'Continue to Stripe' }).click();
   await expect(dialog.getByRole('alert')).toContainText('Please try again later');
-  await expect(dialog.getByRole('button', { name: 'Continue to HitPay' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Continue to Stripe' })).toBeEnabled();
   expect(body).toEqual({ buyer_email: 'mobile-test@example.com', plan: 'bundle' });
   await expect(purchase.getByRole('radio', { name: 'Complete', exact: true })).toHaveAttribute('aria-checked', 'true');
 });

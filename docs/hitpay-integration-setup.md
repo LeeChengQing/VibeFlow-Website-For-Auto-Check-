@@ -18,7 +18,7 @@ Register a publicly reachable HTTPS `/api/hitpay/webhook` URL as a JSON event we
 
 Once the shared purchase modal receives and validates the hosted checkout URL, it replaces the email form with a faded-in secure loading state and a three-second countdown. The modal remains locked against duplicate submissions and dismissal during handoff. Its countdown interval is cleared on completion or unmount, and browser Back restoration resets the handoff state.
 
-The payment request includes `redirect_url` pointing to `/success` on the checkout request's origin. HitPay appends its payment request UUID as `reference`. The return page validates this UUID and reads only the saved order status and webhook confirmation timestamp through the existing server-only commerce client. It never treats the query-string `status` as proof of payment. During its five-second return-to-home countdown, pending confirmation is refreshed once per second; both intervals are cleaned up. Confirmed issuance shows the animated checkmark, while pending or unavailable confirmation shows accurate status copy. The current integration does not send license emails or track email delivery, so the page does not claim an email was sent.
+The payment request includes `redirect_url` pointing to `/success` on the checkout request's origin and includes the internal order UUID as `order_id`. HitPay may also append its payment request UUID as `reference`. The return page validates either identifier and reads payment and fulfillment state through the server-only commerce client; query-string payment status is never trusted. Once the signed webhook confirms payment and fulfillment, `/success` renders the receipt ticket with the saved order reference, amount, masked email, plan and payment provider. Pending or unavailable confirmation stays in the refreshing confirmation view and never presents a PAID ticket. The current integration does not send license emails or track email delivery, so the page does not claim an email was sent.
 
 ```json
 {"buyer_email":"buyer@example.com","plan":"bundle"}
@@ -71,4 +71,4 @@ After replenishment, retry the same verified callback or have an authorized serv
 
 `20261004040308_create_fulfillment_rpc.sql` and `20261004042022_hitpay_payment_tracking.sql` are deployed to Auto-Check (`pocsafloidsjsgriopip`). Migration history matches the local filenames; the client tables remain service-only with forced RLS. See [commerce deployment](commerce-fulfillment-setup.md).
 
-Verification: `npm test`, `npm run typecheck`, `npm run build`, and `npx playwright test --config playwright.hitpay.config.ts`.
+Verification: `npm test`, `npm run typecheck`, and `npm run build`. Storefront checkout has moved to Stripe with ToyyibPay temporarily disabled; see [current checkout setup](checkout-payment-methods.md) and `npx playwright test --config playwright.checkout.config.ts`.

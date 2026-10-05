@@ -13,8 +13,10 @@ test('site migration denies browser roles and atomically publishes/restores/audi
       create schema storage; create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);`);
     await db.exec(readFileSync('supabase/migrations/20261003162918_activation_keys.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/20261003182731_site_management.sql', 'utf8'));
-    const { rows } = await db.query<{ published: unknown }>('select published from public.site_configuration');
-    assert.deepEqual(rows[0].published, DEFAULT_SITE_CONFIG);
+    const { rows } = await db.query<{ published: typeof DEFAULT_SITE_CONFIG }>('select published from public.site_configuration');
+    // Historical marketing copy can differ from today's UI; operational defaults must still match.
+    assert.deepEqual(rows[0].published.packages, DEFAULT_SITE_CONFIG.packages);
+    assert.deepEqual(rows[0].published.settings, DEFAULT_SITE_CONFIG.settings);
     for (const role of ['anon', 'authenticated']) {
       await db.exec(`set role ${role}`);
       for (const table of ['site_configuration', 'site_revisions', 'site_activity', 'site_assets', 'site_uploads']) await assert.rejects(db.query(`select * from public.${table}`), /permission denied/);

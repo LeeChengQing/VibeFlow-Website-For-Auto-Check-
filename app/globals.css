@@ -92,6 +92,14 @@
   .checkout-bottom{margin-top:9px;padding-top:8px}
   .support-orb{right:auto;left:24px;bottom:28px;width:54px;height:54px}
 }
+
+/* A gateway return inside an e-wallet webview uses a deliberately small shell. */
+body:has([data-minimal-payment-return="true"]) .site-header,
+body:has([data-minimal-payment-return="true"]) .site-footer,
+body:has([data-minimal-payment-return="true"]) .support-orb,
+body:has([data-minimal-payment-return="true"]) .skip-link,
+body:has([data-minimal-payment-return="true"]) .mobile-sticky-purchase{display:none!important}
+body:has([data-minimal-payment-return="true"]) #main{min-height:100dvh!important;margin:0!important;padding:0!important}
 @media(max-width:767px){
   .hero-checkout{transform:none;padding:20px}
   .hero-grid{gap:28px}
