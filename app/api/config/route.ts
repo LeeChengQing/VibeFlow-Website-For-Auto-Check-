@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const db = getCommerceDatabase();
+    const db = getCommerceDatabase() as any;
     const { data, error } = await db
       .from('app_config')
       .select('key, value')

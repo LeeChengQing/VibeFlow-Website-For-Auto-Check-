@@ -286,7 +286,7 @@ test('ToyyibPay checkout validates consent and sets return URL token', async () 
   assert.ok(insertedOrder.order_access_token_hash);
   assert.equal(insertedOrder.consent_ua, 'MobileBuyer/2.0');
   assert.ok(postedBody);
-  const billReturnUrl = new URL(postedBody.get('billReturnUrl')!);
+  const billReturnUrl = new URL((postedBody as unknown as URLSearchParams).get('billReturnUrl')!);
   const token = billReturnUrl.searchParams.get('token');
   assert.ok(token);
   assert.equal(verifyOrderAccessToken(token, insertedOrder.order_access_token_hash), true);

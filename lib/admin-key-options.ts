@@ -1,7 +1,7 @@
 import type { ActivationKeyPlan, KeyInventoryStatus, IssuedLicenseStatus } from './supabase/admin';
 
 export const PLAN_LABELS = {
-  bundle: 'Bundle', semester: 'Semester', yearly: 'Yearly', internal_check: 'Internal check', extension: 'Extension',
+  bundle: 'Bundle', semester: 'Semester', yearly: 'Yearly', internal_check: 'Internal check', extension: 'Extension', core: 'Core',
 } satisfies Record<ActivationKeyPlan, string>;
 export const STATUS_LABELS = {
   available: 'Available', assigned: 'Assigned',

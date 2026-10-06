@@ -158,3 +158,23 @@ export function verifyActivationToken(
     error: 'Token and grace period have expired',
   };
 }
+
+/**
+ * Loads the activation public keyring from environment configuration.
+ */
+export function getActivationKeyring(): Record<string, string> {
+  if (process.env.ED25519_KEYRING_JSON) {
+    try {
+      return JSON.parse(process.env.ED25519_KEYRING_JSON);
+    } catch {
+      // fallback
+    }
+  }
+  const currentKid = process.env.ED25519_CURRENT_KID || 'kid-2026-v1';
+  const pubPem = process.env.ED25519_PUBLIC_KEY_PEM || '';
+  if (pubPem) {
+    return { [currentKid]: pubPem };
+  }
+  return {};
+}
+

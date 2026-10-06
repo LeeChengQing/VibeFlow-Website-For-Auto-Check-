@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyActivationToken } from '@/lib/activation/token-service';
+import { verifyActivationToken, getActivationKeyring } from '@/lib/activation/token-service';
 import { sanitizeNotificationContent } from '@/lib/notifications/sanitizer';
 import { getServiceRoleClient } from '@/lib/supabase-admin';
 
@@ -21,8 +21,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Verify Ed25519 token
-    const tokenResult = verifyActivationToken(token);
-    if (!tokenResult.valid || !tokenResult.claims) {
+    const keyring = getActivationKeyring();
+    const tokenResult = verifyActivationToken(token, keyring);
+    if (!tokenResult.allowed || !tokenResult.claims) {
       return NextResponse.json({ error: tokenResult.error || 'INVALID_TOKEN' }, { status: 401 });
     }
 

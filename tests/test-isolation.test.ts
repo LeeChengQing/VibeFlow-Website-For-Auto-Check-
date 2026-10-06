@@ -17,7 +17,7 @@ test('isolatedTestEnvironment strips production credentials and live endpoints',
     PATH: process.env.PATH,
   };
 
-  const safe = isolatedTestEnvironment(dirtyEnv);
+  const safe: any = isolatedTestEnvironment(dirtyEnv as any);
 
   assert.equal(safe.NODE_ENV, 'test');
   assert.equal(safe.APP_URL, 'http://127.0.0.1:3000');

@@ -268,6 +268,7 @@ export function BuyButton({
               <button type="submit" className={className} disabled={busy || !termsAccepted}>
                 {busy ? t('正在打开…', 'Opening…') : t(`前往 ${selectedMethod.provider} 付款`, `Continue to ${selectedMethod.provider}`)}
                 {busy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <span aria-hidden="true">↗</span>}
+              </button>
               <button type="button" className="button secondary" disabled={busy} onClick={closeModal}>
                 {t('取消', 'Cancel')}
               </button>
