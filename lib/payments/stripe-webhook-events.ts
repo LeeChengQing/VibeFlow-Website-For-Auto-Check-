@@ -69,23 +69,37 @@ export async function handleStripeWebhookEvent(db: any, event: Stripe.Event): Pr
         ? charge.payment_intent
         : charge.payment_intent?.id || charge.id;
 
-      if (!paymentIntentId) break;
+      const metadataOrderId = charge.metadata?.order_id;
+      if (!paymentIntentId && !metadataOrderId) break;
 
       let order: any = null;
       if (typeof db.query === 'function') {
         const rows = await queryDb<any>(
           db,
-          `select * from public.orders where provider_payment_id = $1 limit 1`,
-          [paymentIntentId]
+          `select * from public.orders
+           where (provider_payment_id = $1 and $1 is not null)
+              or (id = $2 and $2 is not null)
+           limit 1`,
+          [paymentIntentId || null, metadataOrderId || null]
         );
         if (rows.length > 0) order = rows[0];
       } else if (typeof db.from === 'function') {
-        const { data } = await db
-          .from('orders')
-          .select('*')
-          .eq('provider_payment_id', paymentIntentId)
-          .maybeSingle();
-        order = data;
+        if (paymentIntentId) {
+          const { data } = await db
+            .from('orders')
+            .select('*')
+            .eq('provider_payment_id', paymentIntentId)
+            .maybeSingle();
+          order = data;
+        }
+        if (!order && metadataOrderId) {
+          const { data } = await db
+            .from('orders')
+            .select('*')
+            .eq('id', metadataOrderId)
+            .maybeSingle();
+          order = data;
+        }
       }
 
       if (!order) break;
@@ -112,23 +126,37 @@ export async function handleStripeWebhookEvent(db: any, event: Stripe.Event): Pr
     case 'charge.dispute.created': {
       const dispute = event.data.object as any;
       const paymentIntentId = dispute.payment_intent || dispute.charge;
-      if (!paymentIntentId) break;
+      const metadataOrderId = dispute.metadata?.order_id;
+      if (!paymentIntentId && !metadataOrderId) break;
 
       let order: any = null;
       if (typeof db.query === 'function') {
         const rows = await queryDb<any>(
           db,
-          `select * from public.orders where provider_payment_id = $1 limit 1`,
-          [paymentIntentId]
+          `select * from public.orders
+           where (provider_payment_id = $1 and $1 is not null)
+              or (id = $2 and $2 is not null)
+           limit 1`,
+          [paymentIntentId || null, metadataOrderId || null]
         );
         if (rows.length > 0) order = rows[0];
       } else if (typeof db.from === 'function') {
-        const { data } = await db
-          .from('orders')
-          .select('*')
-          .eq('provider_payment_id', paymentIntentId)
-          .maybeSingle();
-        order = data;
+        if (paymentIntentId) {
+          const { data } = await db
+            .from('orders')
+            .select('*')
+            .eq('provider_payment_id', paymentIntentId)
+            .maybeSingle();
+          order = data;
+        }
+        if (!order && metadataOrderId) {
+          const { data } = await db
+            .from('orders')
+            .select('*')
+            .eq('id', metadataOrderId)
+            .maybeSingle();
+          order = data;
+        }
       }
 
       if (!order) break;
