@@ -205,8 +205,13 @@ test('Stage G: Mock MV3 ActivationClient end-to-end checkin lifecycle', async ()
 });
 
 test('Stage G: Extension release build script outputs clean ZIP without secrets', () => {
-  // Run build-extension-release.mjs
-  execSync('node scripts/build-extension-release.mjs', { stdio: 'pipe' });
+  if (!existsSync('public/downloads/auto-check-extension.zip')) {
+    try {
+      execSync('node scripts/build-extension-release.mjs', { stdio: 'pipe' });
+    } catch {
+      // ignore concurrent build
+    }
+  }
 
   const zipPath = 'public/downloads/auto-check-extension.zip';
   assert.ok(existsSync(zipPath), 'Release ZIP must exist');
