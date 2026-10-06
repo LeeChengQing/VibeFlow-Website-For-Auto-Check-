@@ -3,6 +3,24 @@ import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import type { AdminDatabase } from './admin';
 
+/** Returns true if valid server Supabase commerce credentials and URL are present. */
+export function isCommerceConfigured(): boolean {
+  try {
+    const raw = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    if (!raw || !key) return false;
+    const url = new URL(raw);
+    const local = process.env.NODE_ENV !== 'production' && url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if ((url.protocol !== 'https:' && !local) || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Private server client; callers must validate checkout input or a webhook signature. */
 export function getCommerceDatabase() {
   const raw = process.env.SUPABASE_URL;
