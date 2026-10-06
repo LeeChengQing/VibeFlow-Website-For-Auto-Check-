@@ -41,15 +41,47 @@ export function PaymentReturn({ status, downloadExtension = false, downloadUrl, 
       ? [receiptPlan.period ? `${receiptPlan.name} · ${receiptPlan.period}` : receiptPlan.name]
       : [t('Chrome 扩展 ZIP 安装包', 'Chrome extension ZIP package')];
 
+  const [pollingTimedOut, setPollingTimedOut] = useState(false);
+
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
   }, []);
 
   useEffect(() => {
-    if (!checking) return;
-    const interval = window.setInterval(() => router.refresh(), 2000);
-    return () => window.clearInterval(interval);
-  }, [checking, router]);
+    if (!checking || pollingTimedOut) return;
+    const startTime = Date.now();
+    let timerId: any;
+
+    if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
+      let currentDelay = 2000;
+      function poll() {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= 180000) {
+          setPollingTimedOut(true);
+          return;
+        }
+        router.refresh();
+        currentDelay = Math.min(10000, Math.floor(currentDelay * 1.5));
+        timerId = window.setTimeout(poll, currentDelay);
+      }
+      timerId = window.setTimeout(poll, currentDelay);
+      return () => {
+        if (timerId) window.clearTimeout(timerId);
+      };
+    } else if (typeof window !== 'undefined' && typeof window.setInterval === 'function') {
+      timerId = window.setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= 180000) {
+          setPollingTimedOut(true);
+          return;
+        }
+        router.refresh();
+      }, 2000);
+      return () => {
+        if (timerId) window.clearInterval(timerId);
+      };
+    }
+  }, [checking, pollingTimedOut, router]);
 
   // A pending order is not proof of payment, including after cancellation.
   // Keep its record unchanged so a delayed verified webhook can still fulfill it.
@@ -63,7 +95,9 @@ export function PaymentReturn({ status, downloadExtension = false, downloadUrl, 
     ? deliveryUnavailable
       ? t('付款已确认，但许可证暂时无法显示。请联系支持。', 'Your payment is confirmed, but the license could not be displayed. Please contact support.')
       : t('付款已确认。', 'Your payment is confirmed.')
-    : t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.');
+    : pollingTimedOut
+      ? t('订单正在后台加急履约中。许可证和下载链接将同步发送至您的邮箱，您可以随时关闭此页面。', 'Fulfillment is still in progress in the background. Your license key and download link will be delivered to your email. You may safely close this window.')
+      : t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.');
 
   function getDownloadUrl() {
     return new URL(downloadUrl || '/downloads/auto-check-extension.zip', window.location.origin).href;
