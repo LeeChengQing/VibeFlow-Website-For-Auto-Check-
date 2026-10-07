@@ -105,3 +105,55 @@ GET https://auto-check.example/api/health
 - 正常响应：HTTP 200 `{"status":"healthy","database":"connected","release_asset_ready":true}`
 - 故障响应：HTTP 503 `{"status":"degraded",...}`
 - **安全保障：** 此接口绝不泄露数据库连接串、密码或环境变量私钥。
+
+---
+
+## 6. 试运营退出条件与紧急关停 SOP (Exit Criteria & Shutdown SOP, 附录 B.2 / B.5)
+
+Southampton 约 300 人试运营期间，若发生以下情况，必须在 15 分钟内执行关停响应：
+
+### 6.1 退出触发条件
+1. **校方干预/纪律合规风险**：收到学校任何形式的关于自动签到的违规警示、封锁通告或纪律调查，**必须立即永久关停商业化服务**。
+2. **打卡异常率超标**：连续 3 天打卡失败率超过 5%，或学校签到系统（Forms / e-Attendance）全面改版导致脚本无法在 24 小时内修复。
+3. **关键基础设施熔断**：ntfy 免费通道被封禁或滥用超限，且无法在当日恢复推送；或客服积压工单超过 20 单无法处理。
+
+### 6.2 紧急关停执行流程 (15 分钟 SOP)
+1. **下线所有结账通道**：
+   在 Vercel 环境变量中将 `PAYMENTS_STRIPE_ENABLED` 和 `PAYMENTS_TOYYIBPAY_ENABLED` 设置为 `"false"` 并重新部署，彻底切断新订单入口。
+2. **发布首页维护与停运公告**：
+   通过环境配置或公告横幅展示停运说明与退款指引。
+3. **扩展门禁保护**：
+   服务端保持已激活用户的“失败时宽松”（Fail-open）策略，确保扩展不中断学生正常的本地浏览器使用。
+4. **统一清退与工单处置**：
+   对 7 天内购买且受影响的用户执行全额退款（运行 `select public.process_refund(...)`），并导出完整审计日志备查。
+
+---
+
+## 7. 免费层升级触发条件 (Upgrade Triggers, 附录 B.5)
+
+当前运行于零成本模式（Vercel Hobby + Supabase Free + Best-effort Email），满足以下任意条件时，应触发升级至付费层：
+
+| 触发条件 | 当前指标基线 | 目标动作 | 成本评估 |
+|---|---|---|---|
+| **月净利润持续达标** | 试运营月营收持续 > $50 USD，净利润 > $30 USD 且平稳运行 1 个月 | 1. 购买独立域名（如 .com/.io）<br>2. 升级 Supabase Pro 计划（解锁每日自动备份与更大连接池） | 域名 ~$10/年<br>Supabase Pro $25/月 |
+| **存储容量告警** | 数据库已用空间 > 400 MB（达到 500 MB 免费额度 80%） | 执行历史日志归档转储；若不可归档则升级 Supabase Pro | $25/月 |
+| **用户规模越界** | 活跃付费学生数超过 300 人，或每日 API 调用 > 15,000 次 | 结束校内试运营，正式完成商业化公司/主体注册并上云 | 按商业方案立项 |
+
+---
+
+## 8. 独立域名切换清单 (Custom Domain Migration Checklist, 附录 B.8)
+
+当从 `vercel.app` 迁移至独立域名时，按以下检查清单严格依序操作（系统已实现零硬编码解耦）：
+
+- [ ] **1. DNS 配置**：购买域名，配置 A / CNAME 解析至 Vercel，等待 SSL 证书自动签发生效。
+- [ ] **2. 发信域名验证**：在 Resend / 邮件服务商后台添加 SPF（`v=spf1 include:... ~all`）、DKIM（CNAME）与 DMARC（`v=DMARC1; p=none`）记录，向校园邮箱发送测试信确认进入收件箱。
+- [ ] **3. Vercel 环境变量更新**：
+  - 更新 `APP_URL="https://your-domain.com"`
+  - 更新 `PUBLIC_BASE_URL="https://your-domain.com"`
+- [ ] **4. 支付网关 Webhook 端点切换**：
+  - Stripe Dashboard：添加 Webhook URL `https://your-domain.com/api/payments/stripe/webhook`，保留旧 URL 7 天双发过渡。
+  - ToyyibPay Dashboard：更新 Callback URL 为 `https://your-domain.com/api/payments/toyyibpay/callback`。
+- [ ] **5. 扩展客户端升级**：
+  - 在 `auto-check-extension` 客户端代码更新 API Base URL，提升扩展版本号并打包分发。
+- [ ] **6. 旧域名过渡**：保持 `auto-check.vercel.app` 301 永久重定向至新域名。
+

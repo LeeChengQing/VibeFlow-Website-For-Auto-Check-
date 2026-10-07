@@ -142,5 +142,6 @@ export default async function SuccessPage({ searchParams }: {
   const downloadUrl = hasAccessToken && token ? `/api/site/download/${token}` : undefined;
 
   return <PaymentReturn status={status} downloadExtension={downloadExtension} downloadUrl={downloadUrl}
-    licenseKey={licenseKey} licensePlan={licensePlan} deliveryUnavailable={deliveryUnavailable} receipt={receipt} />;
+    licenseKey={licenseKey} licensePlan={licensePlan} deliveryUnavailable={deliveryUnavailable} receipt={receipt}
+    orderAccessToken={hasAccessToken && token ? token : undefined} />;
 }

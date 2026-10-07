@@ -3,10 +3,11 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { isLocalAdminPreview } from '@/lib/admin-local';
+import { generateOrderAccessToken } from '@/lib/order-access-token';
 import type { Order, Ticket } from '@/lib/types';
 
 export type SiteOperationsData = { local: boolean; orders: Order[]; tickets: Ticket[] };
-export type SiteOperation = 'resend' | 'refund' | 'reply' | 'close' | 'reopen';
+export type SiteOperation = 'resend' | 'refund' | 'reply' | 'close' | 'reopen' | 'generate_recovery_link';
 export type OperationPayload = { email?: string; message?: string };
 export type OperationResult = { ok: true; message: string } | { error: string };
 
@@ -68,7 +69,7 @@ export async function getSiteOperations(): Promise<SiteOperationsData> {
 }
 
 export function validateOperation(action: unknown, id: unknown, input: unknown): { action: SiteOperation; id: string; payload: OperationPayload } {
-  if (!['resend', 'refund', 'reply', 'close', 'reopen'].includes(String(action)) ||
+  if (!['resend', 'refund', 'reply', 'close', 'reopen', 'generate_recovery_link'].includes(String(action)) ||
       typeof action !== 'string' || typeof id !== 'string' ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ||
       !input || typeof input !== 'object' || Array.isArray(input)) throw new Error('INVALID_OPERATION');
@@ -190,6 +191,27 @@ export async function runSiteOperation(action: unknown, id: unknown, input: unkn
 
         return `Fulfillment delivery enqueued for ${order.reference}.`;
       }
+      case 'generate_recovery_link': {
+        let order: any = null;
+        if (typeof db.query === 'function') {
+          const rows = (await db.query(`select * from public.orders where id = $1`, [operation.id])).rows;
+          if (rows.length > 0) order = rows[0];
+        } else if (typeof db.from === 'function') {
+          const { data } = await db.from('orders').select('*').eq('id', operation.id).maybeSingle();
+          order = data;
+        }
+        if (!order) throw new Error('NOT_FOUND');
+
+        const { token, tokenHash } = generateOrderAccessToken();
+        if (typeof db.query === 'function') {
+          await db.query(`update public.orders set order_access_token_hash = $1 where id = $2`, [tokenHash, order.id]);
+        } else if (typeof db.from === 'function') {
+          await db.from('orders').update({ order_access_token_hash: tokenHash }).eq('id', order.id);
+        }
+
+        const baseUrl = process.env.APP_URL || 'http://127.0.0.1:3000';
+        return `${baseUrl}/order/${token}`;
+      }
     }
   }
 
@@ -203,6 +225,9 @@ export async function runSiteOperation(action: unknown, id: unknown, input: unkn
     case 'refund': {
       const order = store.refundOrder(operation.id);
       return `Simulated refund recorded for ${order.reference}; no money moved.`;
+    }
+    case 'generate_recovery_link': {
+      return `http://127.0.0.1:3000/order/${operation.id}`;
     }
     case 'reply': store.replyTicket(operation.id, operation.payload.message, 'admin'); return 'Reply saved to the local support ticket.';
     case 'close': store.closeTicket(operation.id); return 'Local support ticket closed.';

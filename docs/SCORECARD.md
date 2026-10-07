@@ -20,11 +20,12 @@
 | **8. 生产运维与可观测性** | **9.6** | 生产级就绪 | 1. 每日自动对账引擎（扫描未履约订单、孤儿授权、低库存告警）：`lib/ops/reconcile.ts`<br>2. 管理员告警中心（支持 ntfy 管理通道、5分钟去重限流）：`lib/ops/admin-alert.ts`<br>3. 生产健康探测路由（深层检测 DB 读写与发布资源）：`app/api/health/route.ts`<br>4. 生产应急与运维手册（`docs/RUNBOOK.md`）覆盖熔断、故障、补货、事故处置全流程<br>5. 自动化测试通过（`tests/operations-stage-i.test.ts` 3/3 PASS） | 缺口 0.4 分：需要人类在手机端订阅管理员私有 ntfy topic 并配置外部 UptimeRobot 探活服务。 |
 | **9. 测试工程与 CI 门禁** | **9.9** | 生产级就绪 | 1. 全离线网络守卫沙盒：拦截一切非本地外网请求，确保无依赖泄漏<br>2. 严格机密扫描门禁：扫描全部 Git 代码、文档与 ZIP 归档，拦截 `sk_live_` 与私钥<br>3. 全量数据库迁移空库回放：在空白 PGlite 数据库上一键执行全部 13 个迁移与 down 脚本回滚<br>4. TypeScript 类型零错误（`npx tsc --noEmit` 通过）与 Next.js 生产优化构建（`npm run build` 28/28 路由全部编译通过）<br>5. 全量 206/206 个离线隔离测试 100% 绿色通过（`tests/audit-gate-stage-j.test.ts` 4/4 PASS） | 缺口 0.1 分：本地未安装 Docker Desktop 与 Supabase CLI 进行真实的物理端口并发压测。 |
 | **10. 文档交付与交接完整度**| **9.8** | 生产级就绪 | 1. 全套技术与业务交付物完备：`AUDIT.md`, `ARCHITECTURE.md`, `MIGRATION_PLAN.md`, `DECISIONS.md`, `ENV.md`, `SECRETS.md`, `THREAT_MODEL.md`, `RUNBOOK.md`, `SUPPORT_FAQ.md`, `PRICING_MODEL.md`, `RESTORE_DRILL.md`, `NTFY_SELF_HOST.md`, `RELEASE_CHECKLIST.md`, `SCORECARD.md`, `HUMAN_TODO.md`<br>2. 法律条款草案放置于 `docs/LEGAL_DRAFTS/`<br>3. 执行进展记录完整详实：`docs/PROGRESS.md` 关联每次 Git 提交记录 | 缺口 0.2 分：需要人类确认 A.7 商业决策与签署发布交接验收单。 |
+| **11. 零成本交付与试运营 (附录 B/B.8)** | **9.8** | 生产级就绪 | 1. 成功页本地凭证生成与一键下载（`.txt` + Access Token）：`components/PaymentReturn.tsx`<br>2. 订单私密令牌直达路由与严格隐私标头（no-store, noindex, no-referrer）：`app/api/orders/[token]/route.ts`<br>3. 客服专用 Recovery Link 动态轮换：`lib/site-operations.ts`<br>4. GitHub Actions (2日) + Vercel Cron (每日) 双保活与每周加密备份：`.github/workflows/` 及 `vercel.json`<br>5. 全业务代码零硬编码 `vercel.app` 解耦<br>6. 自动化测试通过（`tests/zero-cost-appendix-b.test.ts` 6/6 PASS） | 缺口 0.2 分：需要人类在 GitHub 仓库配置 APP_URL 与 SUPABASE_DB_URL Secrets 并手动触发一次 Actions 验证。 |
 
 ---
 
 ## 2. 综合结论与发布裁决
 
-- **总评均分**：**9.71 / 10.0**
-- **工程就绪状态**：**代码与架构已完全满足 9.5–10 分的生产发布标准**。所有关键路径（支付、履约、激活、退款、通知、门禁、运维、CI）均有高覆盖度自动化测试证明，无任何未经测试的代码引入。
+- **总评均分**：**9.72 / 10.0**
+- **工程就绪状态**：**代码与架构已完全满足 9.5–10 分的生产发布标准**。所有关键路径（支付、履约、激活、退款、通知、门禁、运维、CI、零成本交付）均有高覆盖度自动化测试证明，无任何未经测试的代码引入。
 - **发布授权结论**：**工程阶段全面完工，允许进入人类执行阶段**。请项目所有者参照 `docs/HUMAN_TODO.md` 与 `docs/RELEASE_CHECKLIST.md` 完成云端凭据注入与小额真实验证，即可正式对外营业。

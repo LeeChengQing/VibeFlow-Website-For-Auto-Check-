@@ -10,8 +10,8 @@
 | 优先级 | 事项代码 | 事项名称 | 预计耗时 | 阻塞的发布环节 |
 |:---:|:---:|---|:---:|---|
 | **P0** | H01 | 安装 Docker Desktop 与 Supabase CLI | 30 分钟 | 真实本地多会话并发竞争压力测试 |
-| **P0** | H02 | 域名 DNS 记录配置 (SPF / DKIM / DMARC) | 20 分钟 | 高校学生邮箱 (`.edu`) 履约邮件送达 |
-| **P0** | H03 | 创建/升级 Supabase Pro 生产项目并开启自动备份 | 15 分钟 | 正式上线（免费版因无活动会休眠） |
+| **P0** | H02 | 零成本模式交付验证 (成功页/凭证下载/找回页) | 15 分钟 | 零成本模式下防丢卡密与学生自主提取 |
+| **P0** | H03 | Supabase Free 7天防休眠保活与备份验证 (GitHub Actions) | 15 分钟 | 防止免费数据库暂停休眠与数据无备份 |
 | **P0** | H04 | 生成生产密码学秘钥并安全冷备份 | 20 分钟 | 生产环境密钥激活与令牌签发 |
 | **P0** | H05 | 为全部平台账户开启 2FA 双因素认证 | 30 分钟 | 商业资产与控制台防被盗 |
 | **P0** | H06 | Stripe 生产账户启用与受限业务条款确认 | 30 分钟 | 国际信用卡与 FPX 真实收款 |
@@ -43,28 +43,29 @@
 
 ---
 
-### H02: 域名 DNS 记录配置与高校邮箱送达实测 (P0)
-- **为什么重要**：高校邮箱（如英国 Southampton 的 `@soton.ac.uk` 或国内高校邮箱）对反垃圾邮件策略极其严格，未配置 SPF/DKIM/DMARC 的邮件 100% 会被直接拒收或静默丢弃，导致买家付完款收不到卡密。
-- **具体步骤**：
-  1. 登录域名服务商控制台（如 Cloudflare, Namecheap），进入 DNS 解析配置。
-  2. 添加由 Resend 控制台提供的 SPF TXT 记录：
-     `v=spf1 include:amazonses.com ~all`
-  3. 添加 3 条由 Resend 提供的 DKIM CNAME 记录。
-  4. 添加 DMARC 保护记录：
-     `主机名: _dmarc, 类型: TXT, 记录值: v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@你的域名`
-  5. 在 Resend 控制台发起“Verify Domain”。
-  6. 向真实的学校邮箱发送一封测试履约邮件，检查收件箱与邮件头（Authentication-Results: spf=pass dkim=pass dmarc=pass）。
-- **验收标准**：测试邮件直接送达收件箱，未被归入垃圾箱或退信。
+### H02: 零成本模式交付验证与未来发信域名 DNS 配置 (P0 / 延期至独立域名)
+- **为什么重要**：在零成本模式下（使用 `vercel.app` 免费子域名），无法为发信服务配置独立 DNS 的 SPF/DKIM/DMARC 记录，发信极易被学校 Microsoft 邮箱（如英国 Southampton `@soton.ac.uk`）过滤进垃圾箱。因此系统已落地“去中心化凭证 + 成功页一键下载 + 多通道找回”架构。
+- **当前试运营步骤（零成本模式）**：
+  1. 在支付成功页（`/success`）实测一键下载 `.txt` 凭证文件与复制 Access Token。
+  2. 模拟邮件未收到场景，访问 `/recover` 页面，输入该凭证 Token 验证是否可 100% 提取卡密与专属下载链接。
+  3. 确认邮件通道已降级为尽力而为（Best-effort），页面明确展示防丢凭证告示。
+- **未来升级独立域名时的步骤**：
+  若后续满足升级条件（附录 B.5）购买了独立域名，再按照 `docs/RUNBOOK.md` 第 8 节清单配置 SPF/DKIM/DMARC。
+- **验收标准**：买家在未收到邮件的情况下，仅凭成功页凭证文件或 Token 即可在 `/order/[token]` 或 `/recover` 页面自主提取卡密。
 
 ---
 
-### H03: 创建/升级 Supabase Pro 生产项目并开启自动备份 (P0)
-- **为什么重要**：Supabase Free 版项目在 7 天无 API 调用后会被强制休眠，导致在线服务中断；且免费版无每日自动全量物理备份与 PITR（时间点恢复）。
+### H03: Supabase Free 7天防休眠保活与定时备份验证 (P0)
+- **为什么重要**：业主已确认采用“零成本模式”，不升级 Supabase Pro（省去 \$25/月开销）。但 Supabase Free 实例若连续 7 天无 API/数据库请求，云厂商会自动将其休眠暂停，导致学生签到验证失败。同时免费版不提供每日 PITR 备份。
 - **具体步骤**：
-  1. 登录 Supabase 仪表盘，将绑定的生产 Project 升级为 Pro 计划（\$25/月）。
-  2. 进入 `Project Settings` → `Database` → `Backups`，确认开启每日自动备份。
-  3. 执行一次手动导出备份，将 `.sql` 备份归档至冷存储。
-- **验收标准**：备份状态显示为 Active，最新备份时间戳不超过 24 小时。
+  1. 在 GitHub 仓库 `Settings` → `Secrets and variables` → `Actions` 中添加：
+     - `APP_URL`: 部署后的线上地址（如 `https://auto-check.vercel.app`）
+     - `SUPABASE_DB_URL`: Supabase 生产数据库连接串（包含密码，用于 pg_dump 导出）
+  2. 进入 GitHub Actions 页面，手动触发运行一次 `Supabase Free Keepalive` 工作流，验证 HTTP 200 探活成功。
+  3. 手动触发运行一次 `Supabase Free Weekly Encrypted Backup` 工作流，验证成功生成 `.sql.gz` 产物。
+  4. 若项目未托管在 GitHub，确认 `vercel.json` 包含的 Vercel Cron（每日 02:00 UTC 触发 `/api/health`）已在 Vercel 部署概览中生效。
+  5. 每月安排一次演练：在本地执行一次数据导出并妥善保存到离线硬盘。
+- **验收标准**：GitHub Actions 定时保活每日/两日自动运行且绿色；成功下载一次加密备份归档文件。
 
 ---
 
