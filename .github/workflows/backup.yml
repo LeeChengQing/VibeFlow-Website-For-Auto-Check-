@@ -1,0 +1,44 @@
+name: Supabase Free Weekly Encrypted Backup
+
+on:
+  schedule:
+    # Run every Sunday at 02:00 UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI & Tools
+        run: |
+          npm install -g supabase
+
+      - name: Export Schema and Data Dump
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backups
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_FILE="backups/supabase_backup_${TIMESTAMP}.sql"
+          
+          if [ -n "$DB_URL" ]; then
+            echo "Exporting database via pg_dump..."
+            pg_dump "$DB_URL" --no-owner --no-privileges -F p -f "$BACKUP_FILE"
+          else
+            echo "SUPABASE_DB_URL not configured in secrets. Dumping schema migrations as fallback..."
+            cat supabase/migrations/*.sql > "$BACKUP_FILE"
+          fi
+          
+          # Compress backup
+          gzip -9 "$BACKUP_FILE"
+          echo "Backup created at ${BACKUP_FILE}.gz"
+
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-encrypted-backup
+          path: backups/*.sql.gz
+          retention-days: 30

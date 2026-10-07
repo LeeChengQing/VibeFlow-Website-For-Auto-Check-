@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { getPublishedSiteConfig } from '@/lib/site-settings';
 import { packagePrice, purchaseAllowed } from '@/lib/site-config';
 import { getCommerceDatabase } from '@/lib/supabase/commerce';
+import { validateTermsConsent, hashConsentIp } from '@/lib/consent';
+import { generateOrderAccessToken } from '@/lib/order-access-token';
 import type { ActivationKeyPlan } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
@@ -168,21 +170,37 @@ export async function POST(request: Request) {
       throw Object.assign(new Error('INVALID_EMAIL'), { status: 400 });
     }
 
+    const consent = validateTermsConsent(body);
+    if (!consent.ok) {
+      throw Object.assign(new Error(consent.error ?? 'TERMS_ACCEPTANCE_REQUIRED'), { status: 400 });
+    }
+
     const config = await getPublishedSiteConfig();
     if (!purchaseAllowed(config, publicPlans[plan])) throw Object.assign(new Error('CHECKOUT_UNAVAILABLE'), { status: 409 });
     const amountMinor = packagePrice(config, publicPlans[plan]);
     if (!Number.isSafeInteger(amountMinor) || amountMinor < 100) throw new Error('INVALID_PRICE');
 
     const orderId = randomUUID();
+    const { token: orderAccessToken, tokenHash: orderAccessTokenHash } = generateOrderAccessToken();
+    const consentIpHash = hashConsentIp(
+      request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip')
+    );
+    const consentUa = request.headers.get('user-agent')?.slice(0, 512) ?? null;
     const supabase = getCommerceDatabase();
     const { error: insertError } = await supabase.from('orders').insert({
       id: orderId, reference: orderId, buyer_email: email, plan: plan as ActivationKeyPlan,
       amount_minor: amountMinor, currency: 'MYR', status: 'pending', payment_provider: 'toyyibpay',
+      terms_version: consent.version,
+      terms_accepted_at: consent.acceptedAt,
+      consent_ip_hash: consentIpHash,
+      consent_ua: consentUa,
+      order_access_token_hash: orderAccessTokenHash,
     });
     if (insertError) throw new Error('ORDER_INSERT_FAILED');
 
     const returnUrl = new URL('/success', origin);
     returnUrl.searchParams.set('order_id', orderId);
+    returnUrl.searchParams.set('token', orderAccessToken);
     const fields = new URLSearchParams({
       userSecretKey: secret,
       categoryCode: category,

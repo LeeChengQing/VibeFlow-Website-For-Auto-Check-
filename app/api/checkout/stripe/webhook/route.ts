@@ -1,6 +1,7 @@
 import type Stripe from 'stripe';
 import { fulfillStripeSession } from '@/lib/stripe-fulfillment';
 import { getStripe, readStripeBody, StripeCheckoutError, stripeErrorResponse, stripeResponse } from '@/lib/stripe-server';
+import { getCommerceDatabase } from '@/lib/supabase/commerce';
 
 export const runtime = 'nodejs';
 
@@ -15,9 +16,15 @@ export async function POST(request: Request) {
     apiCall = 'webhooks.constructEvent';
     try { event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET!.trim()); }
     catch { throw new StripeCheckoutError('INVALID_SIGNATURE', 401); }
+
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       await fulfillStripeSession(event.data.object);
+    } else {
+      const { handleStripeWebhookEvent } = await import('@/lib/payments/stripe-webhook-events');
+      const db = getCommerceDatabase();
+      await handleStripeWebhookEvent(db, event);
     }
+
     return stripeResponse({ ok: true });
   } catch (error) { return stripeErrorResponse(error, apiCall); }
 }

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const body = parseHitPayJSON(await readHitPayBody(request, 16_384));
     if (typeof body.plan !== 'string' || !['bundle', 'extension', 'semester', 'yearly', 'internal_check'].includes(body.plan) ||
         typeof body.buyer_email !== 'string') throw new HitPayError('INVALID_CHECKOUT', 400);
-    const plan = body.plan as ActivationKeyPlan;
+    const plan = body.plan as keyof typeof publicPlans | 'internal_check';
     const email = body.buyer_email.trim().toLowerCase();
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HitPayError('INVALID_EMAIL', 400);
 

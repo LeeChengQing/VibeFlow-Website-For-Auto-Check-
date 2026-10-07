@@ -4,13 +4,13 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { notificationPlanCodes, type NotificationBillingPlan, type PlanCode } from '@/lib/plans';
 import { DEFAULT_SITE_CONFIG, offerIsActive, packagePrice, type SiteConfig } from '@/lib/site-config';
 
-const Context = createContext({ config: DEFAULT_SITE_CONFIG, preview: false, initialNow: 0 });
+const Context = createContext({ config: DEFAULT_SITE_CONFIG, preview: false, initialNow: 0, initialBillingPlan: undefined as NotificationBillingPlan | undefined });
 
 /** The context contains settings only. Product, billing and clock state stay in their own components. */
-export function SiteConfigProvider({ config, preview = false, initialNow, children }: {
-  config: SiteConfig; preview?: boolean; initialNow: number; children: React.ReactNode;
+export function SiteConfigProvider({ config, preview = false, initialNow, initialBillingPlan, children }: {
+  config: SiteConfig; preview?: boolean; initialNow: number; initialBillingPlan?: NotificationBillingPlan; children: React.ReactNode;
 }) {
-  const value = useMemo(() => ({ config, preview, initialNow }), [config, preview, initialNow]);
+  const value = useMemo(() => ({ config, preview, initialNow, initialBillingPlan }), [config, preview, initialNow, initialBillingPlan]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
@@ -57,8 +57,8 @@ export function resolveBillingPlan(config: SiteConfig, value: NotificationBillin
 }
 
 export function useNotificationBilling() {
-  const { config } = useSiteConfig();
-  const [selected, setSelected] = useState<NotificationBillingPlan>('yearly');
+  const { config, initialBillingPlan } = useSiteConfig();
+  const [selected, setSelected] = useState<NotificationBillingPlan>(initialBillingPlan ?? 'yearly');
   const billingPlan = resolveBillingPlan(config, selected);
   return { billingPlan, setBillingPlan: setSelected, plan: config.packages.find(item => item.id === notificationPlanCodes[billingPlan])! };
 }

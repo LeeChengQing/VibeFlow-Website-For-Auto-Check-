@@ -5,6 +5,7 @@ import { PaymentReturn, type PaymentReturnStatus } from '@/components/PaymentRet
 import { MinimalPaymentReturn } from '@/components/MinimalPaymentReturn';
 import { isHitPayUUID } from '@/lib/hitpay';
 import { decryptLicenseKey } from '@/lib/license-key-encryption';
+import { verifyOrderAccessToken } from '@/lib/order-access-token';
 import { getCommerceDatabase } from '@/lib/supabase/commerce';
 import type { OrderPlanCode } from '@/lib/plans';
 
@@ -43,11 +44,13 @@ export default async function SuccessPage({ searchParams }: {
   const orderId = firstParam(params.order_id);
   const reference = firstParam(params.reference);
   const billcode = firstParam(params.billcode);
+  const token = firstParam(params.token);
   const providerRequestId = billcode ?? firstParam(params.payment_request_id) ?? firstParam(params.session_id);
   const headersList = await headers();
   const minimalMobileReturn = isGatewayReturn(params) && isMobileWebView(headersList.get('user-agent') ?? '');
   let status: PaymentReturnStatus = 'unverified';
   let downloadExtension = false;
+  let hasAccessToken = false;
   let licenseKey: string | undefined;
   let licensePlan: 'semester' | 'yearly' | undefined;
   let deliveryUnavailable = false;
@@ -63,7 +66,7 @@ export default async function SuccessPage({ searchParams }: {
     try {
       const supabase = getCommerceDatabase();
       let query = supabase.from('orders')
-        .select('id,reference,status,payment_confirmed_at,plan,amount_minor,buyer_email,payment_provider')
+        .select('id,reference,status,payment_confirmed_at,plan,amount_minor,buyer_email,payment_provider,order_access_token_hash,provider_request_id')
         .in('payment_provider', ['hitpay', 'stripe', 'toyyibpay']);
       query = isHitPayUUID(orderId)
         ? query.eq('id', orderId)
@@ -74,7 +77,6 @@ export default async function SuccessPage({ searchParams }: {
       else if (order?.status === 'cancelled' || order?.status === 'refunded') status = 'not_paid';
       else if (order?.payment_confirmed_at && order.status === 'paid') {
         status = 'success';
-        downloadExtension = order.plan === 'extension' || order.plan === 'bundle';
         const [emailName, emailDomain] = order.buyer_email.split('@');
         receipt = {
           reference: order.reference,
@@ -85,15 +87,25 @@ export default async function SuccessPage({ searchParams }: {
           paymentProvider: order.payment_provider as 'hitpay' | 'stripe' | 'toyyibpay',
         };
 
-        if (order.plan === 'bundle' || order.plan === 'semester' || order.plan === 'yearly') {
-          const expectedPlan = order.plan === 'bundle' ? 'semester' : order.plan;
+        hasAccessToken = Boolean(
+          order.order_access_token_hash && token &&
+          verifyOrderAccessToken(token, order.order_access_token_hash)
+        );
+        const hasProviderProof = Boolean(
+          (providerRequestId && providerRequestId === order.provider_request_id) ||
+          (reference && reference === order.reference && reference !== order.id)
+        );
+        const isAuthorized = !order.order_access_token_hash || hasAccessToken || hasProviderProof;
+
+        if (isAuthorized) {
+          downloadExtension = order.plan === 'extension' || order.plan === 'bundle';
           try {
             const { data: license, error: licenseError } = await supabase.from('issued_licenses')
               .select('inventory_id,plan_type')
               .eq('order_id', order.id).eq('status', 'active')
               .abortSignal(AbortSignal.timeout(4000)).maybeSingle();
-            if (licenseError || !license || license.plan_type !== expectedPlan) {
-              deliveryUnavailable = true;
+            if (licenseError || !license) {
+              if (order.plan !== 'extension') deliveryUnavailable = true;
             } else {
               const { data: inventory, error: inventoryError } = await supabase.from('key_inventory')
                 .select('encrypted_key,key_hash')
@@ -103,7 +115,7 @@ export default async function SuccessPage({ searchParams }: {
                 deliveryUnavailable = true;
               } else {
                 licenseKey = decryptLicenseKey(inventory.encrypted_key, inventory.key_hash);
-                licensePlan = expectedPlan;
+                licensePlan = (license.plan_type === 'core' ? 'semester' : license.plan_type) as any;
               }
             }
           } catch {
@@ -111,6 +123,10 @@ export default async function SuccessPage({ searchParams }: {
             licenseKey = undefined;
             licensePlan = undefined;
           }
+        } else {
+          // Sensitive license key and private download link are withheld without access token
+          downloadExtension = false;
+          licenseKey = undefined;
         }
       } else if (order?.payment_confirmed_at) {
         status = 'processing';
@@ -123,8 +139,9 @@ export default async function SuccessPage({ searchParams }: {
 
   // Only confirmed entitlements cross the server/client boundary; no buyer email,
   // payment IDs, hashes, ciphertext, database credentials or privileged client do.
-  if (minimalMobileReturn) return <MinimalPaymentReturn status={status} />;
+  const downloadUrl = hasAccessToken && token ? `/api/site/download/${token}` : undefined;
 
-  return <PaymentReturn status={status} downloadExtension={downloadExtension}
-    licenseKey={licenseKey} licensePlan={licensePlan} deliveryUnavailable={deliveryUnavailable} receipt={receipt} />;
+  return <PaymentReturn status={status} downloadExtension={downloadExtension} downloadUrl={downloadUrl}
+    licenseKey={licenseKey} licensePlan={licensePlan} deliveryUnavailable={deliveryUnavailable} receipt={receipt}
+    orderAccessToken={hasAccessToken && token ? token : undefined} />;
 }

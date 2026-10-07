@@ -8,6 +8,7 @@ import { useLocale } from './LocaleProvider';
 import { useSiteConfig } from './SiteConfigProvider';
 import { purchaseAllowed } from '@/lib/site-config';
 import type { PlanCode } from '@/lib/plans';
+import { CURRENT_TERMS_VERSION } from '@/lib/consent';
 import { isPaymentCheckoutURL, paymentMethods, type PaymentMethod } from '@/lib/payment-checkout';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 
@@ -25,6 +26,7 @@ export function BuyButton({
   const { config, preview } = useSiteConfig();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
   const [error, setError] = useState('');
@@ -130,6 +132,9 @@ export function BuyButton({
   }
 
   function checkoutError(code: unknown) {
+    if (code === 'TERMS_ACCEPTANCE_REQUIRED' || code === 'INVALID_TERMS_VERSION') {
+      return t('请阅读并勾选同意服务条款与退款政策。', 'Please agree to the Terms of Service & Refund Policy.');
+    }
     if (code === 'INVALID_EMAIL' || code === 'INVALID_CHECKOUT') {
       return t('请输入有效的邮箱地址。', 'Please enter a valid email address.');
     }
@@ -142,6 +147,10 @@ export function BuyButton({
   async function buy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!available || !selectedMethod.enabled || submitting.current) return;
+    if (!termsAccepted) {
+      setError(t('请阅读并勾选同意服务条款与退款政策。', 'Please agree to the Terms of Service & Refund Policy.'));
+      return;
+    }
     submitting.current = true;
     setBusy(true);
     setError('');
@@ -151,7 +160,12 @@ export function BuyButton({
       const response = await fetch(selectedMethod.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ buyer_email: email.trim().toLowerCase(), plan: canonicalPlan }),
+        body: JSON.stringify({
+          buyer_email: email.trim().toLowerCase(),
+          plan: canonicalPlan,
+          terms_accepted: true,
+          terms_version: CURRENT_TERMS_VERSION,
+        }),
         signal: AbortSignal.timeout(30_000),
       });
       const result = await response.json();
@@ -233,8 +247,25 @@ export function BuyButton({
               </label>
               <PaymentMethodSelector value={paymentMethod} disabled={busy} name={`${formId}-payment-method`}
                 onChange={method => { setPaymentMethod(method); setError(''); }} />
+              <label className="checkbox-consent flex items-start gap-2.5 text-xs text-white/80 select-none cursor-pointer mt-2 mb-1">
+                <input
+                  type="checkbox"
+                  name={`${formId}-terms`}
+                  checked={termsAccepted}
+                  disabled={busy}
+                  required
+                  onChange={event => { setTermsAccepted(event.target.checked); setError(''); }}
+                  className="mt-0.5 size-4 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-blue-400 focus:ring-offset-0"
+                />
+                <span className="leading-relaxed">
+                  {t('我已阅读并同意', 'I agree to the')}{' '}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-blue-400 hover:text-blue-300">
+                    {t('服务条款与退款政策', 'Terms of Service & Refund Policy')}
+                  </a>
+                </span>
+              </label>
               {error && <p id={errorId} className="form-error" role="alert">{error}</p>}
-              <button type="submit" className={className} disabled={busy}>
+              <button type="submit" className={className} disabled={busy || !termsAccepted}>
                 {busy ? t('正在打开…', 'Opening…') : t(`前往 ${selectedMethod.provider} 付款`, `Continue to ${selectedMethod.provider}`)}
                 {busy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <span aria-hidden="true">↗</span>}
               </button>
