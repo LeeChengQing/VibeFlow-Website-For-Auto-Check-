@@ -29,16 +29,7 @@ export function checkPaymentProviderEnabled(
     return { enabled: true };
   }
 
-  if (provider === 'hitpay') {
-    const val = env.PAYMENTS_HITPAY_ENABLED;
-    if (val === 'false' || val === '0' || val === 'disabled') {
-      return {
-        enabled: false,
-        reason: 'PROVIDER_TEMPORARILY_DISABLED',
-      };
-    }
-    return { enabled: true };
-  }
+  if (provider === 'hitpay') return { enabled:false, reason:'PROVIDER_RETIRED' };
 
-  return { enabled: true };
+  return { enabled:false, reason:'UNSUPPORTED_PROVIDER' };
 }
