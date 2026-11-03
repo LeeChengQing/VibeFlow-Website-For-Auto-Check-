@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { getCommerceDatabase } from '@/lib/supabase/commerce';
+import {commerceDatabase,fulfillUnifiedOrder} from '@/lib/unified-commerce';
 
 export const runtime = 'nodejs';
 
@@ -69,81 +69,19 @@ function toMinorAmount(value: string) {
   return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
 }
 
-export async function POST(request: Request) {
-  try {
-    const secret = process.env.TOYYIBPAY_SECRET_KEY?.trim();
-    if (!secret) throw Object.assign(new Error('TOYYIBPAY_NOT_CONFIGURED'), { status: 503 });
-    const callback = await parseCallback(request, await readBody(request));
-    const statusValue = text(callback.status) ?? text(callback.status_id);
-    const orderId = text(callback.order_id, 64) ?? '';
-    const refno = text(callback.refno);
-    const billCode = text(callback.billcode, 64);
-    const callbackHash = text(callback.hash, 64);
-    if (!statusValue || !refno || !billCode || !callbackHash ||
-        !validCallbackHash(secret, statusValue, orderId, refno, callbackHash)) {
-      return response({ error: 'INVALID_SIGNATURE' }, 401);
-    }
-    if (statusValue !== '1' || (callback.status_id !== undefined && String(callback.status_id) !== '1')) {
-      return response({ received: true });
-    }
-    const isOrderUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderId);
-    if ((orderId && !isOrderUUID) || !/^[A-Za-z0-9_-]{2,64}$/.test(billCode)) return response({ error: 'INVALID_PAYMENT' }, 400);
-    const amount = typeof callback.amount === 'number' && Number.isFinite(callback.amount)
-      ? String(callback.amount) : text(callback.amount, 32);
-    const amountMinor = amount ? toMinorAmount(amount) : undefined;
-    if (amountMinor === undefined) return response({ error: 'INVALID_PAYMENT' }, 400);
-
-    const supabase = getCommerceDatabase();
-    let orderQuery = supabase.from('orders').select('*').eq('payment_provider', 'toyyibpay');
-    orderQuery = isOrderUUID ? orderQuery.eq('id', orderId) : orderQuery.eq('provider_request_id', billCode);
-    const { data: order, error: readError } = await orderQuery.maybeSingle();
-    if (readError) throw new Error('ORDER_READ_FAILED');
-    if (!order) return response({ error: 'ORDER_NOT_FOUND' }, 404);
-    if ((isOrderUUID && order.reference !== orderId) || order.provider_request_id !== billCode || order.amount_minor !== amountMinor || order.currency !== 'MYR') {
-      return response({ error: 'PAYMENT_MISMATCH' }, 409);
-    }
-    if (!['pending', 'paid'].includes(order.status) ||
-        (order.provider_payment_id && order.provider_payment_id !== refno)) return response({ error: 'TRANSACTION_CONFLICT' }, 409);
-
-    if (!order.provider_payment_id) {
-      if (order.status !== 'pending') return response({ error: 'PAYMENT_STATE_INCONSISTENT' }, 409);
-      const { data: captured, error: captureError } = await supabase.from('orders')
-        .update({ provider_payment_id: refno, payment_confirmed_at: new Date().toISOString() })
-        .eq('id', order.id).eq('status', 'pending').is('provider_payment_id', null).select('id').maybeSingle();
-      if (captureError) {
-        if (captureError.code === '23505') return response({ error: 'TRANSACTION_CONFLICT' }, 409);
-        throw new Error('PAYMENT_CAPTURE_SAVE_FAILED');
-      }
-      if (!captured) {
-        const { data: current, error } = await supabase.from('orders').select('provider_payment_id,status')
-          .eq('id', order.id).maybeSingle();
-        if (error) throw new Error('PAYMENT_CAPTURE_READ_FAILED');
-        if (current?.provider_payment_id !== refno || !['pending', 'paid'].includes(current.status)) {
-          return response({ error: 'TRANSACTION_CONFLICT' }, 409);
-        }
-      }
-    }
-
-    const { data: licenseId, error: fulfillmentError } = await supabase.rpc('assign_available_key', { p_order_id: order.id });
-    if (fulfillmentError?.message === 'INVENTORY_EXHAUSTED') {
-      console.error('CRITICAL TOYYIBPAY_INVENTORY_EXHAUSTED', { orderId: order.id, paymentId: refno });
-      const { error } = await supabase.from('orders').update({ fulfillment_error: 'INVENTORY_EXHAUSTED' })
-        .eq('id', order.id).eq('status', 'pending').eq('provider_payment_id', refno);
-      if (error) throw new Error('FULFILLMENT_ALERT_SAVE_FAILED');
-      return response({ received: true });
-    }
-    if (fulfillmentError || (order.plan === 'extension' ? licenseId !== null : !licenseId)) {
-      throw new Error('FULFILLMENT_FAILED');
-    }
-    const { error: cleanupError } = await supabase.from('orders').update({ fulfillment_error: null })
-      .eq('id', order.id).eq('status', 'paid').eq('provider_payment_id', refno);
-    if (cleanupError) console.error('TOYYIBPAY_FULFILLMENT_ALERT_CLEAR_FAILED', { orderId: order.id });
-    return response({ received: true });
-  } catch (error) {
-    const status = typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number'
-      ? error.status : 500;
-    const code = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'WEBHOOK_FAILED';
-    if (status >= 500) console.error('TOYYIBPAY_WEBHOOK_FAILED', code);
-    return response({ error: code }, status);
-  }
+export async function POST(request:Request){
+  try{
+    const secret=process.env.TOYYIBPAY_SECRET_KEY?.trim();
+    if(!secret)return response({error:'TOYYIBPAY_NOT_CONFIGURED'},503);
+    const callback=await parseCallback(request,await readBody(request));
+    const status=text(callback.status)??text(callback.status_id),orderId=text(callback.order_id,64)??'',payment=text(callback.refno),bill=text(callback.billcode,64),signature=text(callback.hash,64);
+    if(!status||!payment||!bill||!signature||!validCallbackHash(secret,status,orderId,payment,signature))return response({error:'INVALID_SIGNATURE'},401);
+    if(status!=='1')return response({received:true});
+    const amount=toMinorAmount(String(callback.amount??''));if(amount===undefined)return response({error:'INVALID_PAYMENT'},400);
+    let query=commerceDatabase().from('payment_orders').select('*').eq('payment_provider','toyyibpay');
+    query=orderId?query.eq('id',orderId):query.eq('provider_request_id',bill);
+    const {data:order,error}=await query.maybeSingle();if(error)throw Error('ORDER_READ_FAILED');if(!order)return response({received:true});
+    await fulfillUnifiedOrder(order,payment,amount,'MYR',bill);
+    return response({received:true});
+  }catch{return response({error:'PAYMENT_PROCESSING_FAILED'},503);}
 }

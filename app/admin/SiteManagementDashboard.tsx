@@ -8,7 +8,7 @@ import { logoutAction } from './actions';
 import { EditorPanel, SiteConfigEditor, TextField, type EditorSection } from './SiteConfigEditor';
 import { glassPanel, primaryButton, secondaryButton } from './admin-ui';
 
-const sections = ['Overview', 'Pricing & Offers', 'Packages', 'Guides', 'Content', 'Orders & Support', 'Key Inventory', 'History', 'Site Settings'] as const;
+const sections = ['Overview', 'Pricing & Offers', 'Packages', 'Guides', 'Content', 'Orders & Support', 'Plugin Licenses', 'History', 'Site Settings'] as const;
 type Section = typeof sections[number];
 type Guard = { message: string; proceed: () => void };
 const unavailableManagement: SiteManagementData = { draft: DEFAULT_SITE_CONFIG, published: DEFAULT_SITE_CONFIG, version: 0, history: [], activity: [], local: false };
@@ -16,7 +16,7 @@ const stringify = (value: SiteConfig) => JSON.stringify(value, (_, item: unknown
 const rm = (amount: number) => new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR' }).format(amount / 100);
 const date = (value: string) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kuala_Lumpur' }).format(new Date(value));
 const sectionDescription: Record<Section, string> = {
-  Overview: 'Your storefront and operations at a glance.', 'Pricing & Offers': 'Set prices and schedule promotional offers.', Packages: 'Shape the packages customers see and buy.', Guides: 'Keep installation and setup instructions current.', Content: 'Write the storefront in English and Chinese.', 'Orders & Support': 'Manage customer orders and support requests.', 'Key Inventory': 'Provision and track activation keys.', History: 'Review publications and restore a previous version to draft.', 'Site Settings': 'Manage availability, contact details and release delivery.',
+  Overview: 'Your storefront and operations at a glance.', 'Pricing & Offers': 'Set prices and schedule promotional offers.', Packages: 'Shape the packages customers see and buy.', Guides: 'Keep installation and setup instructions current.', Content: 'Write the storefront in English and Chinese.', 'Orders & Support': 'Manage customer orders and support requests.', 'Plugin Licenses': 'Provision and track activation keys.', History: 'Review publications and restore a previous version to draft.', 'Site Settings': 'Manage availability, contact details and release delivery.',
 };
 
 function Modal({ title, children, close }: { title: string; children: ReactNode; close: () => void }) {
@@ -54,7 +54,7 @@ export function SiteManagementDashboard({ management: suppliedManagement, childr
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (['plan', 'status', 'page'].some(key => params.has(key))) { setSelectedSection('Key Inventory'); return; }
+    if (['plan', 'status', 'page'].some(key => params.has(key))) { setSelectedSection('Plugin Licenses'); return; }
     try { const saved = sessionStorage.getItem('auto-check:admin-section'); if (sections.includes(saved as Section)) setSelectedSection(saved as Section); } catch { /* Section navigation works when storage is disabled. */ }
   }, []);
   function setSection(next: Section) {
@@ -177,7 +177,7 @@ export function SiteManagementDashboard({ management: suppliedManagement, childr
             <EditorPanel title="Publication workflow" description="Edit → Save draft → Preview draft → Publish changes"><p className="text-sm leading-6 text-white/55">A saved draft is private. Publishing applies its prices, content, guides and settings to the storefront together. History restores a previous publication into draft for review.</p><div className="flex flex-wrap gap-3"><button type="button" className={secondaryButton} onClick={() => request(() => setSection('Pricing & Offers'))}>Edit pricing</button><button type="button" className={secondaryButton} onClick={() => request(() => setSection('History'))}>Review history</button></div></EditorPanel>
           </div>}
           {/* Keep inventory mounted so one-time plaintext keys survive saves and section changes. */}
-          <div hidden={section !== 'Key Inventory'} className="min-w-0 [&>section]:my-0 [&>section]:border-0 [&>section]:p-0">{children}</div>
+          <div hidden={section !== 'Plugin Licenses'} className="min-w-0 [&>section]:my-0 [&>section]:border-0 [&>section]:p-0">{children}</div>
           <div hidden={section !== 'Orders & Support'} className="min-w-0">{operations}</div>
           {(['Pricing & Offers', 'Packages', 'Guides', 'Content', 'Site Settings'] as string[]).includes(section) && <form onSubmit={e => { e.preventDefault(); if (!busy && dirty) save(); }}><fieldset disabled={busy || !settingsAvailable} className="min-w-0"><legend className="sr-only">{section} draft editor</legend><SiteConfigEditor section={section as EditorSection} config={config} onChange={change} upload={upload} uploading={uploading || !settingsAvailable} /></fieldset></form>}
           {section === 'History' && <div className="grid gap-6"><EditorPanel title="Published versions" description="Restoring creates a new draft. The current live website stays unchanged until you publish.">{management.history.length === 0 ? <p className="py-5 text-sm text-white/50">No publications yet. Your first publication will appear here.</p> : <div className="divide-y divide-white/10">{management.history.map(entry => <article key={entry.id} className="flex flex-wrap items-center justify-between gap-4 py-5"><div className="min-w-0"><p className="text-sm font-medium">Version {entry.version}<span className="ml-3 text-xs font-normal text-white/45">{date(entry.createdAt)} MYT</span></p><p className="mt-2! whitespace-pre-wrap break-words text-sm leading-6 text-white/55">{entry.note || 'Published without a note'}</p></div><button type="button" disabled={busy || !settingsAvailable} className={secondaryButton} onClick={() => request(() => setRestoreId(entry.id), 'Restoring this version will replace the draft. Save your current edits first, or discard them to continue.')}>Restore to draft</button></article>)}</div>}</EditorPanel><EditorPanel title="Activity log" description="Recent administrative changes, newest first.">{management.activity.length === 0 ? <p className="text-sm text-white/50">No activity recorded yet.</p> : <ol className="divide-y divide-white/10">{management.activity.map(entry => <li key={entry.id} className="grid gap-2 py-4 sm:grid-cols-[150px_minmax(0,1fr)]"><time className="font-mono text-[11px] leading-6 text-white/40">{date(entry.createdAt)}</time><div><p className="text-sm font-medium">{entry.action.replaceAll('_', ' ')}</p><p className="mt-1! break-words text-sm leading-6 text-white/50">{entry.detail}</p></div></li>)}</ol>}</EditorPanel></div>}

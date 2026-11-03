@@ -10,7 +10,7 @@ export type { Order, Ticket } from './types';
 const dbPath = process.env.LOCAL_DB_PATH || join(process.cwd(), '.local', 'vibeflow.sqlite');
 mkdirSync(dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
-db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
+db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
  CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, token TEXT UNIQUE NOT NULL, reference TEXT UNIQUE NOT NULL, data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, token TEXT UNIQUE NOT NULL, data TEXT NOT NULL);`);
 const now = () => new Date().toISOString();

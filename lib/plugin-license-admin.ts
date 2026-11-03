@@ -1,29 +1,25 @@
 import 'server-only';
 import {createClient} from '@supabase/supabase-js';
-import {createHash,randomBytes} from 'node:crypto';
+import {createHash} from 'node:crypto';
+import {generatePluginLicenseKey} from './plugin-license-key';
 import {requireAdminSession} from '@/lib/admin-auth';
 import type {PluginIssueInput,PluginIssueResult,PluginLicenseData,PluginLicenseView,PluginSearchParams,PluginPlan} from './plugin-license-types';
 
 const plans=['trial','semester_license','lifetime_license'];
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function database(){
-  const url=process.env.PLUGIN_AUTH_SUPABASE_URL,key=process.env.PLUGIN_AUTH_SUPABASE_SERVICE_ROLE_KEY;
+  const url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
   const local=process.env.NODE_ENV!=='production'&&url==='http://127.0.0.1:54330';
   if((url!=='https://qckpwckfukyurkobrsig.supabase.co'&&!local)||!key?.trim())throw Error('PLUGIN_ADMIN_NOT_CONFIGURED');
   return createClient(url,key.trim(),{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch:(input,init)=>fetch(input,{...init,cache:'no-store'})}});
 }
 function validNote(note:unknown){return typeof note==='string'&&note.trim().length>0&&note.length<=500;}
-function generate(){
-  const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let raw='',value=0,bits=0;
-  for(const byte of randomBytes(20)){value=(value<<8)|byte;bits+=8;while(bits>=5){bits-=5;raw+=alphabet[(value>>>bits)&31];}}
-  return `AC-LIC-${raw.match(/.{4}/g)!.join('-')}`;
-}
 export async function issuePluginLicense(input:PluginIssueInput):Promise<PluginIssueResult>{
   await requireAdminSession();
   if(!input||typeof input!=='object'||!plans.includes(input.plan)||!Number.isInteger(input.maxDevices)||input.maxDevices<1||input.maxDevices>100||!validNote(input.note)||typeof input.expiresAt!=='string')throw Error('INVALID_PARAMETERS');
   const expiresAt=input.expiresAt?new Date(input.expiresAt):null;
   if((input.plan!=='lifetime_license'&&!expiresAt)||(expiresAt&&(!Number.isFinite(expiresAt.getTime())||expiresAt.getTime()<=Date.now())))throw Error('INVALID_PARAMETERS');
-  const db=database(),code=generate(),hash=createHash('sha256').update(code).digest('hex');
+  const db=database(),code=generatePluginLicenseKey(),hash=createHash('sha256').update(code).digest('hex');
   const {data,error}=await db.rpc('issue_plugin_license',{p_key_hash:hash,p_plan:input.plan,p_expires_at:expiresAt?.toISOString()??null,p_max_devices:input.maxDevices,p_note:'Admin: '+input.note.trim().slice(0,493)});
   if(error||data?.ok!==true||typeof data.license_id!=='string'||!uuid.test(data.license_id))throw Error('PLUGIN_WRITE_UNAVAILABLE');
   return {code,licenseId:data.license_id};

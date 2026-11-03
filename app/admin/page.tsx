@@ -8,8 +8,8 @@ import { AdminLoginForm } from './AdminLoginForm';
 import { PluginLicensePanel } from './PluginLicensePanel';
 import { SiteManagementDashboard } from './SiteManagementDashboard';
 import { getSiteManagementData } from '@/lib/site-settings';
-import { getSiteOperations } from '@/lib/site-operations';
-import { OperationsPanel, OperationsOverview } from './OperationsPanel';
+import {UnifiedOrdersPanel} from './UnifiedOrdersPanel';
+
 import { adminSurface, glassPanel } from './admin-ui';
 
 export const runtime = 'nodejs';
@@ -33,9 +33,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   catch { /* Preserve the dashboard instance and one-time modal during read failures. */ }
   const inventory = <PluginLicensePanel data={data} />;
   let management = null;
-  let operations = { local: false, orders: [], tickets: [] } as Awaited<ReturnType<typeof getSiteOperations>>;
-  const [settingsResult, operationsResult] = await Promise.allSettled([getSiteManagementData(), getSiteOperations()]);
-  if (settingsResult.status === 'fulfilled') management = settingsResult.value;
-  if (operationsResult.status === 'fulfilled') operations = operationsResult.value;
-  return <SiteManagementDashboard management={management} operations={<OperationsPanel data={operations} />} overview={<><OperationsOverview data={operations} />{data && <p className="text-sm text-cyan-200">{data.total} plugin licenses</p>}</>}>{inventory}</SiteManagementDashboard>;
+  try { management=await getSiteManagementData(); } catch {}
+  return <SiteManagementDashboard management={management} operations={<UnifiedOrdersPanel/>} overview={<>{data && <p className="text-sm text-cyan-200">{data.total} plugin licenses</p>}</>}>{inventory}</SiteManagementDashboard>;
 }
