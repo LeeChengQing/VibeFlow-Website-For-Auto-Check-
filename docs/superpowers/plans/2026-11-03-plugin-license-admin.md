@@ -1,7 +1,7 @@
 # Current plugin license admin implementation plan
 
 **Goal:** Manage the deployed plugin authorization system from the existing website admin.
-**Architecture:** Reuse administrator sessions and incumbent admin styling. Replace the old Key Inventory surface with a panel backed only by CHINA_SUPABASE_URL / CHINA_SUPABASE_SERVICE_ROLE_KEY, pinned to qckpwckfukyurkobrsig. Keep payment/order code unchanged. Issue 160-bit AC-LIC keys, expose plaintext once, persist SHA-256 only. Device release deletes only a binding and preserves an audit event; existing activation/status RPCs remain unchanged, as expressly requested by the user.
+**Architecture:** Reuse administrator sessions and incumbent admin styling. Replace the old Key Inventory surface with a panel backed only by PLUGIN_AUTH_SUPABASE_URL / PLUGIN_AUTH_SUPABASE_SERVICE_ROLE_KEY, pinned to qckpwckfukyurkobrsig. Keep payment/order code unchanged. Issue 160-bit AC-LIC keys, expose plaintext once, persist SHA-256 only. Device release deletes only a binding and preserves an audit event; existing activation/status RPCs remain unchanged, as expressly requested by the user.
 **Authorization:** User approved this approach by continuing and confirmed all prior keys are disposable during debugging. Preserve devices, credentials, schedules and phone entitlements. Prepare and verify before publishing; no automatic deletion during page load.
 **Workspace:** Clean production-source checkout C:/Auto-Check Website-hitpay-retirement-20261020, branch codex/plugin-license-admin-20261103; preserve unrelated dirty primary checkout.
 **Tech:** Next.js 16.3.8, React, existing Supabase client, node:test/tsx, PGlite, Playwright. No new dependencies.

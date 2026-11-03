@@ -16,8 +16,8 @@
 ## 安全与部署
 
 - 所有读取与修改均先验证现有8小时管理员会话，权限凭证只在服务端使用。
-- 只读取 `CHINA_SUPABASE_URL` / `CHINA_SUPABASE_SERVICE_ROLE_KEY`，URL固定为 `https://qckpwckfukyurkobrsig.supabase.co`。不回退到订单/商务数据库。
-- 两个变量已存在于该Vercel项目的production环境中；仍需线上验证实际连接。预览环境不会自动继承production变量。
+- 只读取 `PLUGIN_AUTH_SUPABASE_URL` / `PLUGIN_AUTH_SUPABASE_SERVICE_ROLE_KEY`，URL固定为 `https://qckpwckfukyurkobrsig.supabase.co`。不回退到订单/商务数据库。
+- 两个独立变量已配置在该Vercel项目的production环境中；旧CHINA和商务连接不变。预览环境不会自动继承production变量。
 - 仅应用 `supabase/migrations/20261103142304_plugin_license_admin_device_release.sql`，不要执行全仓库 `db push`。
 - 增量只扩充事件类型并增加service-role-only解绑RPC；原激活、校验与停用RPC均不修改。
 - 基线生产源码为 `939daf0468749765c2cd525f63bc9e0a3ea119c4`；工作分支 `codex/plugin-license-admin-20261103`。保留原有HitPay退役设置。

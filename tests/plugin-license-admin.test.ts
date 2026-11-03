@@ -9,7 +9,7 @@ function setup(authorized=true,fail=false){
   const admin=loadServerModule<typeof import('../lib/plugin-license-admin')>('lib/plugin-license-admin.ts',{
     '@/lib/admin-auth':{requireAdminSession:async()=>{if(!authorized)throw Error('UNAUTHORIZED');}},
     '@supabase/supabase-js':{createClient:()=>{calls.push({name:'client',args:{}});return {rpc:async(name:string,args:Record<string,unknown>)=>{calls.push({name,args});return {data:{ok:!fail,license_id:'11111111-1111-4111-8111-111111111111'},error:fail?{message:'PRIVATE_DB_DETAIL'}:null};}};}},
-  },{process:{env:{NODE_ENV:'test',CHINA_SUPABASE_URL:'https://qckpwckfukyurkobrsig.supabase.co',CHINA_SUPABASE_SERVICE_ROLE_KEY:'server-test-only'}}});
+  },{process:{env:{NODE_ENV:'test',PLUGIN_AUTH_SUPABASE_URL:'https://qckpwckfukyurkobrsig.supabase.co',PLUGIN_AUTH_SUPABASE_SERVICE_ROLE_KEY:'server-test-only'}}});
   return {admin,calls};
 }
 const input={plan:'trial',expiresAt:'2030-01-01T00:00:00Z',maxDevices:1,note:'testing'};
@@ -47,7 +47,7 @@ test('ledger uses bounded queries, strips full hashes and ignores malformed filt
     const row={id:'11111111-1111-4111-8111-111111111111',license_key_hash:'a'.repeat(64),plan:'trial',status:'active',max_devices:1,expires_at:'2020-01-01T00:00:00Z',created_at:'2026-01-01T00:00:00Z',note:'note',plugin_license_activations:[],plugin_license_events:[]};
     return new Response(init?.method==='HEAD'?null:JSON.stringify([row]),{headers:{'Content-Type':'application/json','Content-Range':'0-0/26'}});
   }}});
-  const admin=loadServerModule<typeof import('../lib/plugin-license-admin')>('lib/plugin-license-admin.ts',{'@/lib/admin-auth':{requireAdminSession:async()=>{}},'@supabase/supabase-js':{createClient:()=>client}},{process:{env:{CHINA_SUPABASE_URL:'https://qckpwckfukyurkobrsig.supabase.co',CHINA_SUPABASE_SERVICE_ROLE_KEY:'test-only'}}});
+  const admin=loadServerModule<typeof import('../lib/plugin-license-admin')>('lib/plugin-license-admin.ts',{'@/lib/admin-auth':{requireAdminSession:async()=>{}},'@supabase/supabase-js':{createClient:()=>client}},{process:{env:{PLUGIN_AUTH_SUPABASE_URL:'https://qckpwckfukyurkobrsig.supabase.co',PLUGIN_AUTH_SUPABASE_SERVICE_ROLE_KEY:'test-only'}}});
   const result=await admin.getPluginLicenseData({plan:'__proto__',status:['active'],page:'999'});
   assert.equal(result.page,2);assert.equal(result.plan,'');assert.equal(result.status,'');assert.equal(result.licenses[0].status,'expired');
   assert.equal(result.licenses[0].identifier,'a'.repeat(12));assert.ok(!JSON.stringify(result).includes('a'.repeat(64)));
@@ -56,6 +56,6 @@ test('ledger uses bounded queries, strips full hashes and ignores malformed filt
 });
 test('wrong authorization database fails closed even when commerce configuration is present',async()=>{
   let created=false;
-  const admin=loadServerModule<typeof import('../lib/plugin-license-admin')>('lib/plugin-license-admin.ts',{'@/lib/admin-auth':{requireAdminSession:async()=>{}},'@supabase/supabase-js':{createClient:()=>{created=true;}}},{process:{env:{CHINA_SUPABASE_URL:'https://wrong.supabase.co',CHINA_SUPABASE_SERVICE_ROLE_KEY:'test',SUPABASE_URL:'https://qckpwckfukyurkobrsig.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test'}}});
+  const admin=loadServerModule<typeof import('../lib/plugin-license-admin')>('lib/plugin-license-admin.ts',{'@/lib/admin-auth':{requireAdminSession:async()=>{}},'@supabase/supabase-js':{createClient:()=>{created=true;}}},{process:{env:{PLUGIN_AUTH_SUPABASE_URL:'https://wrong.supabase.co',PLUGIN_AUTH_SUPABASE_SERVICE_ROLE_KEY:'test',SUPABASE_URL:'https://qckpwckfukyurkobrsig.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'test'}}});
   await assert.rejects(admin.issuePluginLicense(input),/PLUGIN_ADMIN_NOT_CONFIGURED/);assert.equal(created,false);
 });
