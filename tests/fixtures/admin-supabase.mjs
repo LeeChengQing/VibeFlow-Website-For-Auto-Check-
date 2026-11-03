@@ -1,12 +1,15 @@
 // Local REST fixture for dashboard browser tests. No real Supabase project is used.
 import { createServer } from 'node:http';
+import {randomUUID} from 'node:crypto';
 
 let rows = [];
 let licenses = [];
 let failInsert = false;
 let failRead = false;
+let pluginRows=[];
 const reset = () => {
   failInsert = false; failRead = false;
+  pluginRows=Array.from({length:27},(_,index)=>({id:`44444444-4444-4444-8444-${String(index).padStart(12,'0')}`,license_key_hash:index.toString(16).padStart(64,'0'),plan:'trial',status:'active',max_devices:1,expires_at:'2030-01-01T00:00:00Z',created_at:'2026-01-01T00:00:00Z',note:`Fixture license ${index}`,plugin_license_activations:index===26?[{device_id:'55555555-5555-4555-8555-555555555555',activated_at:'2026-01-01T00:00:00Z'}]:[],plugin_license_events:[]}));
   rows = Array.from({ length: 32 }, (_, index) => ({
     id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
     key_hash: index.toString(16).padStart(64, '0'),
@@ -38,6 +41,27 @@ createServer(async (request, response) => {
   const joined = row => ({ ...row, issued_licenses: licenses.find(license => license.inventory_id === row.id) ?? null });
   if (url.pathname === '/__rows') return json(200, rows.map(joined));
   if (url.pathname === '/__licenses') return json(200, licenses);
+  if(url.pathname==='/__plugin-rows')return json(200,pluginRows);
+  if(url.pathname==='/rest/v1/plugin_licenses'||url.pathname.startsWith('/rest/v1/rpc/')){
+    if(request.headers.apikey!=='test-service-role-only-credentials')return json(401,{});
+    if(url.pathname.includes('/rpc/')){
+      let body='';for await(const chunk of request)body+=chunk;const args=JSON.parse(body);
+      if(failInsert)return json(500,{message:'private-plugin-db-error'});
+      if(url.pathname.endsWith('/issue_plugin_license')){
+        if(!/^[a-f0-9]{64}$/.test(args.p_key_hash)||Object.keys(args).some(key=>!['p_key_hash','p_plan','p_expires_at','p_max_devices','p_note'].includes(key)))return json(400,{});
+        const row={id:randomUUID(),license_key_hash:args.p_key_hash,plan:args.p_plan,status:'active',expires_at:args.p_expires_at,max_devices:args.p_max_devices,note:args.p_note,created_at:new Date().toISOString(),plugin_license_activations:[],plugin_license_events:[{event_type:'issued',device_id:null,note:args.p_note,created_at:new Date().toISOString()}]};pluginRows.unshift(row);return json(200,{ok:true,license_id:row.id});
+      }
+      const row=pluginRows.find(row=>row.id===args.p_license_id);if(!row)return json(200,{ok:false});
+      if(url.pathname.endsWith('/revoke_plugin_license')){row.status='revoked';row.plugin_license_events.push({event_type:'revoked',note:args.p_note,device_id:null,created_at:new Date().toISOString()});return json(200,{ok:true});}
+      if(url.pathname.endsWith('/release_plugin_license_device')){row.plugin_license_activations=row.plugin_license_activations.filter(d=>d.device_id!==args.p_device_id);row.plugin_license_events.push({event_type:'unbound',device_id:args.p_device_id,note:args.p_note,created_at:new Date().toISOString()});return json(200,{ok:true});}
+      return json(404,{});
+    }
+    if(failRead)return json(500,{message:'private-plugin-db-error'});
+    let result=pluginRows.filter(row=>(!url.searchParams.has('plan')||url.searchParams.get('plan')===`eq.${row.plan}`)&&(!url.searchParams.has('status')||url.searchParams.get('status')===`eq.${row.status}`||url.searchParams.get('status')===`neq.revoked`&&row.status!=='revoked'));
+    const count=result.length;result.sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id.localeCompare(a.id));
+    const offset=Number(url.searchParams.get('offset')||0),limit=Number(url.searchParams.get('limit')||25);result=result.slice(offset,offset+limit);
+    response.setHeader('Content-Range',`${offset}-${offset+result.length-1}/${count}`);response.setHeader('Content-Type','application/json');response.writeHead(200);return response.end(request.method==='HEAD'?undefined:JSON.stringify(result));
+  }
   const table = url.pathname.slice('/rest/v1/'.length);
   if (!['key_inventory', 'issued_licenses'].includes(table) || !url.pathname.startsWith('/rest/v1/')) return json(404, {});
   if (request.headers.apikey !== 'test-service-role-only-credentials') return json(401, { message: 'invalid credential' });

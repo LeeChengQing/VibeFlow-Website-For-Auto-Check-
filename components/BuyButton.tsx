@@ -8,7 +8,7 @@ import { useLocale } from './LocaleProvider';
 import { useSiteConfig } from './SiteConfigProvider';
 import { purchaseAllowed } from '@/lib/site-config';
 import type { PlanCode } from '@/lib/plans';
-import { CURRENT_TERMS_VERSION } from '@/lib/consent';
+import { CURRENT_TERMS_VERSION } from '@/lib/consent-version';
 import { isPaymentCheckoutURL, paymentMethods, type PaymentMethod } from '@/lib/payment-checkout';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 

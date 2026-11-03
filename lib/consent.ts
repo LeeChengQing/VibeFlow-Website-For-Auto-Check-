@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
-export const CURRENT_TERMS_VERSION = '2026-10-06';
+import { CURRENT_TERMS_VERSION } from './consent-version';
+export { CURRENT_TERMS_VERSION } from './consent-version';
 
 /**
  * Creates a privacy-preserving SHA-256 hash of an IP address using an application salt.

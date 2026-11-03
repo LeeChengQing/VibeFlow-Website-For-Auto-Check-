@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getAdminSession } from '@/lib/admin-auth';
-import { getAdminDashboardData, type AdminSearchParams } from '@/lib/admin-key-data';
+import { getPluginLicenseData } from '@/lib/plugin-license-admin';
+import type { PluginSearchParams } from '@/lib/plugin-license-types';
 import { isLocalAdminPreview } from '@/lib/admin-local';
 import { AdminLoginForm } from './AdminLoginForm';
-import { AdminDashboard } from './AdminDashboard';
+import { PluginLicensePanel } from './PluginLicensePanel';
 import { SiteManagementDashboard } from './SiteManagementDashboard';
 import { getSiteManagementData } from '@/lib/site-settings';
 import { getSiteOperations } from '@/lib/site-operations';
@@ -15,7 +16,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Auto-Check · Site management', robots: { index: false, follow: false } };
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<AdminSearchParams> }) {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<PluginSearchParams> }) {
   const showLocalPreview = await isLocalAdminPreview();
   let session;
   try { session = await getAdminSession(); }
@@ -28,13 +29,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
   if (!session) return <AdminLoginForm showLocalPreview={showLocalPreview} />;
   let data = null;
-  try { data = await getAdminDashboardData(await searchParams); }
+  try { data = await getPluginLicenseData(await searchParams); }
   catch { /* Preserve the dashboard instance and one-time modal during read failures. */ }
-  const inventory = <AdminDashboard data={data} showLocalPreview={showLocalPreview} embedded />;
+  const inventory = <PluginLicensePanel data={data} />;
   let management = null;
   let operations = { local: false, orders: [], tickets: [] } as Awaited<ReturnType<typeof getSiteOperations>>;
   const [settingsResult, operationsResult] = await Promise.allSettled([getSiteManagementData(), getSiteOperations()]);
   if (settingsResult.status === 'fulfilled') management = settingsResult.value;
   if (operationsResult.status === 'fulfilled') operations = operationsResult.value;
-  return <SiteManagementDashboard management={management} operations={<OperationsPanel data={operations} />} overview={<><OperationsOverview data={operations} />{data && <p className="text-sm text-cyan-200">{data.summary.available} keys available · {data.summary.redeemed} issued licenses</p>}</>}>{inventory}</SiteManagementDashboard>;
+  return <SiteManagementDashboard management={management} operations={<OperationsPanel data={operations} />} overview={<><OperationsOverview data={operations} />{data && <p className="text-sm text-cyan-200">{data.total} plugin licenses</p>}</>}>{inventory}</SiteManagementDashboard>;
 }
