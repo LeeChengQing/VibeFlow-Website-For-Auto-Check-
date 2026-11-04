@@ -138,13 +138,14 @@ export function BuyButton({
   }
 
   function checkoutError(code: unknown) {
+    if(code==='USE_EXTENSION_FOR_PHONE')return t('请在插件的手机通知页面选择方案，付款后自动开通当前设备。','Choose your phone plan in the extension to activate notifications on that device.');
     if (code === 'TERMS_ACCEPTANCE_REQUIRED' || code === 'INVALID_TERMS_VERSION') {
       return t('请阅读并勾选同意服务条款与退款政策。', 'Please agree to the Terms of Service & Refund Policy.');
     }
     if (code === 'INVALID_EMAIL' || code === 'INVALID_CHECKOUT') {
       return t('请输入有效的邮箱地址。', 'Please enter a valid email address.');
     }
-    if (code === 'CHECKOUT_UNAVAILABLE' || code === 'STRIPE_NOT_CONFIGURED' || code === 'TOYYIBPAY_NOT_CONFIGURED' || code === 'INVALID_PRICE') {
+    if (code === 'CHECKOUT_UNAVAILABLE' || code === 'PROVIDER_NOT_CONFIGURED' || code === 'STRIPE_NOT_CONFIGURED' || code === 'TOYYIBPAY_NOT_CONFIGURED' || code === 'INVALID_PRICE') {
       return t('结账暂不可用，请稍后再试。', 'Checkout is currently unavailable. Please try again later.');
     }
     return t('暂时无法打开付款页面，请稍后重试。', 'Could not open checkout. Please try again later.');
@@ -152,6 +153,7 @@ export function BuyButton({
 
   async function buy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if(canonicalPlan==='semester'||canonicalPlan==='yearly'){setError(checkoutError('USE_EXTENSION_FOR_PHONE'));return;}
     if (!available || !selectedMethod.enabled || submitting.current) return;
     if (!termsAccepted) {
       setError(checkoutError('TERMS_ACCEPTANCE_REQUIRED'));
