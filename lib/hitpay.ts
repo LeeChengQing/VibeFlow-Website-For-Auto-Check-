@@ -10,14 +10,6 @@ export function hitPayResponse(body: Record<string, unknown>, status = 200) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-export function hitPaySandboxConfig() {
-  const apiKey = process.env.HITPAY_API_KEY?.trim();
-  if (process.env.HITPAY_ENABLED !== 'true' || process.env.HITPAY_ENVIRONMENT !== 'sandbox' || !apiKey) {
-    throw new HitPayError('HITPAY_NOT_CONFIGURED', 503);
-  }
-  return { apiKey, endpoint: 'https://api.sandbox.hit-pay.com/v1/payment-requests' };
-}
-
 /** Preserve a rejected provider body verbatim, except for known credential values. */
 export function hitPayRawDiagnosticText(text: string, credentials: string[]): string {
   for (const value of credentials.filter(Boolean)) {

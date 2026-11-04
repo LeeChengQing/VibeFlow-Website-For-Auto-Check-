@@ -11,11 +11,21 @@ export function getCommerceDatabase() {
   const url = new URL(raw);
   const local = process.env.NODE_ENV !== 'production' && url.protocol === 'http:' &&
     ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if ((url.protocol !== 'https:' && !local) || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
+  if ((!local && url.origin !== 'https://qckpwckfukyurkobrsig.supabase.co') || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
     throw new Error('COMMERCE_NOT_CONFIGURED');
   }
   return createClient<AdminDatabase>(url.origin, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) },
+  });
+}
+
+/** Historical HitPay settlement only; never fall back to the canonical sales database. */
+export function getHistoricalHitPayDatabase() {
+  const key=process.env.HITPAY_LEGACY_SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if(!key)throw new Error('HISTORICAL_HITPAY_NOT_CONFIGURED');
+  return createClient<AdminDatabase>('https://pocsafloidsjsgriopip.supabase.co',key,{
+    auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+    global:{fetch:(input,init)=>fetch(input,{...init,cache:'no-store'})},
   });
 }

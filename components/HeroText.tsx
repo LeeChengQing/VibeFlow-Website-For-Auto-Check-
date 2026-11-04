@@ -9,7 +9,7 @@ export const LeftHeroText = memo(function LeftHeroText() {
   const { config: { hero } } = useSiteConfig();
 
   return (
-    <div className="hero-copy">
+    <div className="hero-copy" lang={locale==='zh'?'zh-CN':'en'}>
       <p className="eyebrow">
         <span className="status-dot" />
         {hero.eyebrow[locale]}

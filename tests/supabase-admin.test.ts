@@ -6,7 +6,7 @@ type Admin = typeof import('../lib/supabase/admin');
 
 function setup(authorized = true) {
   const env: Record<string, string | undefined> = {
-    NODE_ENV: 'production', SUPABASE_URL: 'https://project.supabase.co',
+    NODE_ENV: 'production', SUPABASE_URL: 'https://qckpwckfukyurkobrsig.supabase.co',
     SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-public-key',
   };
@@ -33,7 +33,7 @@ test('service-role data requests are authorized and uncached', async () => {
   assert.equal(result.error, null);
   assert.deepEqual(result.data, []);
   assert.equal(requests.length, 1);
-  assert.match(requests[0].url, /^https:\/\/project.supabase.co\/rest\/v1\/key_inventory/);
+  assert.match(requests[0].url, /^https:\/\/qckpwckfukyurkobrsig.supabase.co\/rest\/v1\/key_inventory/);
   assert.equal(requests[0].headers.get('apikey'), 'test-service-role-key');
   assert.equal(requests[0].headers.get('authorization'), 'Bearer test-service-role-key');
   assert.equal(requests[0].cache, 'no-store');
@@ -51,6 +51,7 @@ test('missing service-role credentials never fall back to a public key', async (
     ['SUPABASE_SERVICE_ROLE_KEY', undefined], ['SUPABASE_SERVICE_ROLE_KEY', '  '],
     ['SUPABASE_URL', undefined], ['SUPABASE_URL', 'invalid'],
     ['SUPABASE_URL', 'http://project.supabase.co'],
+    ['SUPABASE_URL', 'https://project.supabase.co'],
     ['SUPABASE_URL', 'https://user:password@project.supabase.co'],
   ] as const) {
     const { admin, env, requests } = setup();

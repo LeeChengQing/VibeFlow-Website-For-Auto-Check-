@@ -4,9 +4,8 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createAdminSession, deleteAdminSession, requireAdminSession, verifyAdminPassword } from '@/lib/admin-auth';
 import { generateActivationCode, hashActivationCode } from '@/lib/admin-keys';
-import { encryptLicenseKey } from '@/lib/license-key-encryption';
 import { isKeyPlan, type ActionError } from '@/lib/admin-key-options';
-import { getSupabaseAdmin, type KeyInventoryInsert } from '@/lib/supabase/admin';
+import { pricingDatabase } from '@/lib/canonical-commerce';
 
 export async function loginAction(password: string): Promise<ActionError> {
   try {
@@ -30,17 +29,19 @@ export async function logoutAction(): Promise<void> {
 export async function generateKeysAction(plan: string, count: number): Promise<string[] | ActionError> {
   try {
     await requireAdminSession();
+    if(process.env.NODE_ENV==='production')return {error:'Privileged key provisioning is disabled pending MFA, fresh authentication and audit acceptance.'};
     if (!isKeyPlan(plan) || !Number.isInteger(count) || count < 1 || count > 100) {
       return { error: 'Choose a valid plan and a whole number of keys from 1 to 100.' };
     }
-    const db = await getSupabaseAdmin();
+    if(!['extension','internal_check'].includes(plan))return {error:'Phone and bundle purchases are fulfilled only from verified payments; no notification keys are issued.'};
+    const db = pricingDatabase();
     const codes = Array.from({ length: count }, generateActivationCode);
-    const rows: KeyInventoryInsert[] = codes.map(code => {
+    const rows = codes.map(code => {
       const key_hash = hashActivationCode(code);
-      return { key_hash, encrypted_key: encryptLicenseKey(code, key_hash), plan_type: plan, status: 'available' };
+      return {license_key:code,license_key_hash:key_hash,plan:plan==='internal_check'?'trial':'lifetime_license',...(plan==='internal_check'?{expires_at:new Date(Date.now()+7*86400000).toISOString()}:{})};
     });
     // A single multi-row INSERT is atomic. Do not insert per code or return DB records.
-    const { error } = await db.from('key_inventory').insert(rows);
+    const { error } = await db.from('plugin_licenses').insert(rows);
     if (error) return { error: 'Could not create the batch. Please try again.' };
     revalidatePath('/admin');
     return codes;

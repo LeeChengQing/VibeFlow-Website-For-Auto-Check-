@@ -30,7 +30,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   let data = null;
   try { data = await getAdminDashboardData(await searchParams); }
   catch { /* Preserve the dashboard instance and one-time modal during read failures. */ }
-  const inventory = <AdminDashboard data={data} showLocalPreview={showLocalPreview} embedded />;
+  const inventory = <><Link href="/admin/pricing" className="button secondary">价格与优惠排期</Link><AdminDashboard data={data} showLocalPreview={showLocalPreview} embedded /></>;
   let management = null;
   let operations = { local: false, orders: [], tickets: [] } as Awaited<ReturnType<typeof getSiteOperations>>;
   const [settingsResult, operationsResult] = await Promise.allSettled([getSiteManagementData(), getSiteOperations()]);

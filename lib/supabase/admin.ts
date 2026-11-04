@@ -110,7 +110,7 @@ function supabaseConfig() {
   }
   const localHttp = process.env.NODE_ENV !== 'production' && parsed.protocol === 'http:' &&
     ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
-  if ((parsed.protocol !== 'https:' && !localHttp) || parsed.username || parsed.password ||
+  if ((!localHttp && parsed.origin !== 'https://qckpwckfukyurkobrsig.supabase.co') || parsed.username || parsed.password ||
       parsed.search || parsed.hash || parsed.pathname !== '/') {
     throw new Error('SUPABASE_ADMIN_NOT_CONFIGURED');
   }

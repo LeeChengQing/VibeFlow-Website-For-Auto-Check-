@@ -7,8 +7,8 @@ import { packagePrice, purchaseAllowed, type SiteConfig } from './site-config';
 import type { Order, Ticket } from './types';
 export type { Order, Ticket } from './types';
 
-const dbPath = process.env.LOCAL_DB_PATH || join(process.cwd(), '.local', 'vibeflow.sqlite');
-mkdirSync(dirname(dbPath), { recursive: true });
+const dbPath = process.env.NODE_ENV === 'production' ? ':memory:' : process.env.LOCAL_DB_PATH || join(process.cwd(), '.local', 'vibeflow.sqlite');
+if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
 db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, token TEXT UNIQUE NOT NULL, reference TEXT UNIQUE NOT NULL, data TEXT NOT NULL);

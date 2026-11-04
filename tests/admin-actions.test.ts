@@ -33,8 +33,8 @@ function setup(options: { authorized?: boolean; dbError?: boolean; passwordValid
       deleteAdminSession: async () => { events.push('logout'); },
       requireAdminSession: async () => { if (options.authorized === false) throw new Error('UNAUTHORIZED'); },
     },
-    '@/lib/supabase/admin': { getSupabaseAdmin: async () => ({ from: (table: string) => {
-      assert.equal(table, 'key_inventory');
+    '@/lib/canonical-commerce': { pricingDatabase: () => ({ from: (table: string) => {
+      assert.equal(table, 'plugin_licenses');
       return { insert: async (rows: Record<string, unknown>[]) => {
         batches.push(rows);
         return { error: options.dbError ? { message: 'database-private-detail' } : null };
@@ -80,30 +80,30 @@ test('unauthorized or invalid provisioning never inserts or returns codes', asyn
   assert.deepEqual(events, []);
 });
 
-test('one batch insert persists hashes and encrypted keys, then returns plaintext after success', async () => {
+test('one batch insert provisions canonical plugin keys; phone and bundle sales do not generate manual keys', async () => {
   const { actions, batches, events, keys } = setup();
-  for (const plan of ['bundle', 'semester', 'yearly', 'internal_check']) {
+  for (const plan of ['extension', 'internal_check']) {
     const result = await actions.generateKeysAction(plan, 100);
     assert.ok(Array.isArray(result));
     assert.equal(result.length, 100);
     const batch = batches.at(-1)!;
     assert.equal(batch.length, 100);
     batch.forEach((row, index) => {
-      assert.deepEqual(Object.keys(row).sort(), ['encrypted_key', 'key_hash', 'plan_type', 'status']);
-      assert.equal(row.key_hash, keys.hashActivationCode(result[index]));
-      assert.equal(encryption.decryptLicenseKey(row.encrypted_key as string, row.key_hash as string), result[index]);
-      assert.equal(row.plan_type, plan);
-      assert.equal(row.status, 'available');
+      assert.equal(row.license_key_hash, keys.hashActivationCode(result[index]));
+      assert.equal(row.license_key, result[index]);
+      assert.equal(row.plan, plan==='internal_check'?'trial':'lifetime_license');
+      if(plan==='internal_check')assert.ok(Date.parse(String(row.expires_at))>Date.now());
     });
   }
-  assert.equal(batches.length, 4);
-  assert.equal(events.length, 4);
+  for(const plan of ['semester','yearly','bundle'])assert.ok(!Array.isArray(await actions.generateKeysAction(plan,1)));
+  assert.equal(batches.length, 2);
+  assert.equal(events.length, 2);
   assert.ok(events.every(event => event === 'revalidate:/admin'));
 });
 
 test('failed inserts expose a safe error and no plaintext', async () => {
   const { actions, events } = setup({ dbError: true });
-  const result = await actions.generateKeysAction('bundle', 5);
+  const result = await actions.generateKeysAction('extension', 5);
   assert.ok(!Array.isArray(result));
   assert.ok(result.error);
   assert.doesNotMatch(JSON.stringify(result), /database-private-detail|AC-/);

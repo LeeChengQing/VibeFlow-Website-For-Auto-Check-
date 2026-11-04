@@ -4,17 +4,18 @@ import { paymentMethods, type PaymentMethod } from '@/lib/payment-checkout';
 import { useLocale } from './LocaleProvider';
 import styles from './payment-method-selector.module.css';
 
-export function PaymentMethodSelector({ value, onChange, disabled, name }: {
+export function PaymentMethodSelector({ value, onChange, disabled, name, availableProviders = [] }: {
   value: PaymentMethod;
   onChange: (method: PaymentMethod) => void;
   disabled: boolean;
   name: string;
+  availableProviders?: string[];
 }) {
   const { t } = useLocale();
   return <fieldset className={styles.group} disabled={disabled}>
     <legend className={styles.legend}>{t('付款方式', 'Payment method')}</legend>
     <div className={styles.options}>
-      {paymentMethods.map(method => <label key={method.id}
+      {paymentMethods.map(item => ({...item,enabled:item.enabled&&availableProviders.includes(item.id)})).map(method => <label key={method.id}
         className={`${styles.card} payment-method-card ${value === method.id ? `${styles.selected} is-selected` : ''} ${!method.enabled ? styles.unavailable : ''}`}>
         <input className={styles.radio} type="radio" name={name} value={method.id}
           checked={value === method.id} disabled={disabled || !method.enabled}

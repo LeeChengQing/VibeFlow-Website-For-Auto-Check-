@@ -4,10 +4,15 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode, typ
 import { createPortal } from 'react-dom';
 import { m, useReducedMotion } from 'framer-motion';
 import { LoaderCircle, LockKeyhole } from 'lucide-react';
+import { Bouncy } from 'ldrs/react';
+import Checkbox from '@mui/material/Checkbox';
+import 'ldrs/react/Bouncy.css';
 import { useLocale } from './LocaleProvider';
 import { useSiteConfig } from './SiteConfigProvider';
-import { purchaseAllowed } from '@/lib/site-config';
+import { purchaseAllowed, packagePrice } from '@/lib/site-config';
+import { price } from '@/lib/plans';
 import type { PlanCode } from '@/lib/plans';
+import { CURRENT_TERMS_VERSION } from '@/lib/terms';
 import { isPaymentCheckoutURL, paymentMethods, type PaymentMethod } from '@/lib/payment-checkout';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 
@@ -22,9 +27,10 @@ export function BuyButton({
   plan, children, className = 'button primary', triggerRef,
 }: { plan: PlanCode; children: ReactNode; className?: string; triggerRef?: Ref<HTMLButtonElement> }) {
   const { t } = useLocale();
-  const { config, preview } = useSiteConfig();
+  const { config, preview, providers } = useSiteConfig();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
   const [error, setError] = useState('');
@@ -40,13 +46,15 @@ export function BuyButton({
   const formId = useId();
   const emailId = `${formId}-email`;
   const errorId = `${formId}-error`;
+  const consentId = `${formId}-consent`;
   const dialogTitleId = `${formId}-title`;
   const canonicalPlan = checkoutPlans[plan];
   const selectedMethod = paymentMethods.find(method => method.id === paymentMethod)!;
-  const available = !preview && purchaseAllowed(config, plan);
+  const available = !preview && purchaseAllowed(config, plan) && providers.length>0;
   const unavailableMessage = preview
     ? t('预览模式无法结账', 'Checkout is disabled in preview')
     : t('此方案暂不可购买', 'This package is currently unavailable');
+  useEffect(()=>{if(providers.length&&!providers.includes(paymentMethod))setPaymentMethod(providers[0] as PaymentMethod);},[providers,paymentMethod]);
 
   useEffect(() => {
     if (!open || (!available && !isRedirecting)) return;
@@ -130,6 +138,9 @@ export function BuyButton({
   }
 
   function checkoutError(code: unknown) {
+    if (code === 'TERMS_ACCEPTANCE_REQUIRED' || code === 'INVALID_TERMS_VERSION') {
+      return t('请阅读并勾选同意服务条款与退款政策。', 'Please agree to the Terms of Service & Refund Policy.');
+    }
     if (code === 'INVALID_EMAIL' || code === 'INVALID_CHECKOUT') {
       return t('请输入有效的邮箱地址。', 'Please enter a valid email address.');
     }
@@ -142,16 +153,22 @@ export function BuyButton({
   async function buy(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!available || !selectedMethod.enabled || submitting.current) return;
+    if (!termsAccepted) {
+      setError(checkoutError('TERMS_ACCEPTANCE_REQUIRED'));
+      return;
+    }
     submitting.current = true;
     setBusy(true);
     setError('');
     let redirecting = false;
 
     try {
+      const token=sessionStorage.getItem('auto-check-device-token');
+      if(!providers.includes(paymentMethod)){setError(checkoutError('CHECKOUT_UNAVAILABLE'));return;}
       const response = await fetch(selectedMethod.endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ buyer_email: email.trim().toLowerCase(), plan: canonicalPlan }),
+        headers: { 'Content-Type': 'application/json', ...(token?{Authorization:'Bearer '+token}:{}) },
+        body: JSON.stringify({ buyer_email: email.trim().toLowerCase(), plan: canonicalPlan, terms_accepted: true, terms_version: CURRENT_TERMS_VERSION }),
         signal: AbortSignal.timeout(30_000),
       });
       const result = await response.json();
@@ -205,7 +222,7 @@ export function BuyButton({
                 className="flex min-h-64 flex-col items-center justify-center gap-5 py-6 text-center"
               >
                 <div className="relative flex size-20 items-center justify-center rounded-full border border-white/10 bg-white/5" aria-hidden="true">
-                  <LoaderCircle className="absolute size-14 animate-spin text-white/70 motion-reduce:animate-none" strokeWidth={1.5} />
+                  <Bouncy size={45} speed={1.75} color="white" />
                   <LockKeyhole className="size-5 text-white" strokeWidth={1.5} />
                 </div>
                 <h2 id={dialogTitleId} className="text-xl font-semibold tracking-tight" role="status">
@@ -217,6 +234,7 @@ export function BuyButton({
                 <p className="text-xs text-white/40">{t(`由 ${selectedMethod.provider} 提供安全付款`, `Secure checkout by ${selectedMethod.provider}`)}</p>
               </m.div>
             ) : <form id={formId} className="form" onSubmit={buy} aria-busy={busy}>
+              <p>{t('当前价格','Current price')} · {price(packagePrice(config,plan))}</p>
               <h2 id={dialogTitleId} className="text-xl font-semibold">
                 {t('完成购买', 'Complete your purchase')}
               </h2>
@@ -231,10 +249,24 @@ export function BuyButton({
                   placeholder="you@example.com"
                 />
               </label>
-              <PaymentMethodSelector value={paymentMethod} disabled={busy} name={`${formId}-payment-method`}
+              <PaymentMethodSelector value={paymentMethod} disabled={busy} name={`${formId}-payment-method`} availableProviders={providers}
                 onChange={method => { setPaymentMethod(method); setError(''); }} />
+              <div className="checkbox-consent text-xs text-white/80" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span id={consentId} className="leading-relaxed" style={{ flex: 1, minWidth: 0 }}>
+                  {t('我已阅读并同意', 'I agree to the')}{' '}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-blue-400 hover:text-blue-300">
+                    {t('服务条款与退款政策', 'Terms of Service & Refund Policy')}
+                  </a>
+                </span>
+                <Checkbox
+                  name={`${formId}-terms`} checked={termsAccepted} disabled={busy} required disableRipple={false}
+                  onChange={event => { setTermsAccepted(event.target.checked); setError(''); }}
+                  slotProps={{ input: { 'aria-labelledby': consentId, 'aria-describedby': error ? errorId : undefined } }}
+                  sx={{ flexShrink: 0, color: 'rgba(255,255,255,0.5)', '&.Mui-checked': { color: '#5eead4' }, '&.Mui-focusVisible': { outline: '2px solid #5eead4', outlineOffset: 2 } }}
+                />
+              </div>
               {error && <p id={errorId} className="form-error" role="alert">{error}</p>}
-              <button type="submit" className={className} disabled={busy}>
+              <button type="submit" className={className} disabled={busy || !termsAccepted}>
                 {busy ? t('正在打开…', 'Opening…') : t(`前往 ${selectedMethod.provider} 付款`, `Continue to ${selectedMethod.provider}`)}
                 {busy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <span aria-hidden="true">↗</span>}
               </button>

@@ -7,23 +7,23 @@ type Data = typeof import('../lib/admin-key-data');
 function setup(failTable = '') {
   const requests: URL[] = [];
   const row = { id: 'uuid-1', key_hash: 'a'.repeat(64), plan_type: 'bundle', status: 'available',
-    issued_licenses: null };
+    license_id:null,license_status:null,buyer_email:null,device_id:null,activated_at:null };
   const issued = { id: 'uuid-2', key_hash: 'b'.repeat(64), plan_type: 'yearly', status: 'assigned',
-    issued_licenses: { id: 'license-1', buyer_email: 'buyer@example.com', device_id: 'device-1',
-      activated_at: '2026-10-04T00:00:00Z', status: 'active' } };
+    license_id: 'license-1', buyer_email: 'buyer@example.com', device_id: 'device-1',
+      activated_at: '2026-10-04T00:00:00Z', license_status: 'active' };
   const revoked = { id: 'uuid-3', key_hash: 'c'.repeat(64), plan_type: 'semester', status: 'assigned',
-    issued_licenses: { id: 'license-2', buyer_email: 'other@example.com', device_id: null,
-      activated_at: null, status: 'revoked' } };
+    license_id: 'license-2', buyer_email: 'other@example.com', device_id: null,
+      activated_at: null, license_status: 'revoked' };
   const db = createClient('https://example.supabase.co', 'test-service-key', {
     auth: { persistSession: false }, global: { fetch: async (input, init) => {
       const url = new URL(String(input)); requests.push(url);
       const table = url.pathname.split('/').at(-1)!;
-      if (!['key_inventory', 'issued_licenses'].includes(table)) return new Response('{}', { status: 404 });
+      if (!['website_license_admin'].includes(table)) return new Response('{}', { status: 404 });
       if (table === failTable) return new Response(JSON.stringify({ message: 'private-db-error' }), { status: 400 });
       const plan = url.searchParams.get('plan_type');
       const status = url.searchParams.get('status');
-      const count = table === 'issued_licenses' ? 22 : plan && status ? 26 : plan ? ({ 'eq.bundle': 40, 'eq.semester': 20,
-        'eq.yearly': 15, 'eq.internal_check': 5, 'eq.extension': 7 }[plan] ?? 0) : status === 'eq.available' ? 55 : 87;
+      const count = plan && status ? 26 : plan ? ({ 'eq.bundle': 40, 'eq.semester': 20,
+        'eq.yearly': 15, 'eq.internal_check': 5, 'eq.extension': 7 }[plan] ?? 0) : status === 'eq.available' ? 55 : status === 'eq.assigned' ? 22 : 87;
       return new Response(init?.method === 'HEAD' ? null : JSON.stringify(plan || status ? [row] : [row, issued, revoked]), {
         headers: { 'Content-Type': 'application/json', 'Content-Range': `0-0/${count}` },
       });
@@ -31,7 +31,7 @@ function setup(failTable = '') {
   });
   const shared = loadServerModule('lib/admin-key-options.ts', {});
   const data = loadServerModule<Data>('lib/admin-key-data.ts', {
-    '@/lib/admin-key-options': shared, '@/lib/supabase/admin': { getSupabaseAdmin: async () => db },
+    '@/lib/admin-key-options': shared, '@/lib/admin-auth':{requireAdminSession:async()=>{}}, '@/lib/canonical-commerce': { pricingDatabase: () => db },
   });
   return { data, requests };
 }
@@ -52,12 +52,12 @@ test('filtered pages retain global summaries and expose hash prefixes only', asy
   const list = requests.find(url => url.searchParams.has('limit'))!;
   assert.equal(list.searchParams.get('offset'), '25');
   assert.equal(list.searchParams.get('limit'), '25');
-  assert.equal(list.pathname, '/rest/v1/key_inventory');
+  assert.equal(list.pathname, '/rest/v1/website_license_admin');
   assert.equal(list.searchParams.get('order'), 'id.desc');
-  assert.equal(list.searchParams.get('select'), 'id,key_hash,plan_type,status,issued_licenses(id,buyer_email,device_id,activated_at,status)');
-  const issuedCount = requests.find(url => url.pathname.endsWith('/issued_licenses'))!;
+  assert.equal(list.searchParams.get('select'), '*');
+  const issuedCount = requests.find(url => url.searchParams.get('status')==='eq.assigned'&&!url.searchParams.has('limit'))!;
   assert.equal(issuedCount.searchParams.get('select'), 'id');
-  assert.equal(issuedCount.searchParams.has('status'), false);
+  assert.equal(issuedCount.searchParams.get('status'), 'eq.assigned');
 });
 
 test('malformed query values never reach database filters or unbounded offsets', async () => {
@@ -75,7 +75,7 @@ test('malformed query values never reach database filters or unbounded offsets',
 });
 
 test('database read failures expose only a safe error', async () => {
-  for (const table of ['key_inventory', 'issued_licenses']) {
+  for (const table of ['website_license_admin']) {
     const { data } = setup(table);
     await assert.rejects(data.getAdminDashboardData({}), /ADMIN_DATA_UNAVAILABLE/);
   }

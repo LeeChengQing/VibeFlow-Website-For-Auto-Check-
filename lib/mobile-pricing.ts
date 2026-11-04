@@ -12,7 +12,7 @@ export function mobilePricing(config: SiteConfig, now: number) {
   const purchasable = notifications.filter(p => p.enabled);
   const starting = [...(purchasable.length ? purchasable : notifications)].sort((a, b) => packagePrice(config, a.id, now) - packagePrice(config, b.id, now))[0];
   return {
-    bundle: { amount, regular: bundle.amount, separate: extension.amount + semester.amount, discounted: amount < bundle.amount },
+    bundle: { amount, regular: bundle.amount, separate: packagePrice(config, extension.id, now) + packagePrice(config, semester.id, now), discounted: amount < bundle.amount },
     extension: packagePrice(config, 'extension', now),
     notification: starting ? { id: starting.id, amount: packagePrice(config, starting.id, now) } : null,
   };

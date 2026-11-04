@@ -1,4 +1,4 @@
-import { getCommerceDatabase } from '@/lib/supabase/commerce';
+import { getHistoricalHitPayDatabase } from '@/lib/supabase/commerce';
 import {
   HitPayError, extractHitPayPayment, hitPayResponse, parseHitPayJSON,
   readHitPayBody, verifyHitPaySignature,
@@ -8,6 +8,7 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
+    if (process.env.HITPAY_LEGACY_SETTLEMENT_ENABLED !== 'true') throw new HitPayError('HISTORICAL_SETTLEMENT_DISABLED', 503);
     const salt = process.env.HITPAY_WEBHOOK_SALT;
     if (!salt) throw new HitPayError('WEBHOOK_NOT_CONFIGURED', 503);
     const rawBody = await readHitPayBody(request, 262_144);
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     const payment = extractHitPayPayment(parseHitPayJSON(rawBody), request.headers);
     if (!payment) return hitPayResponse({ ok: true });
 
-    const supabase = getCommerceDatabase();
+    const supabase = getHistoricalHitPayDatabase();
     const { data: order, error: readError } = await supabase.from('orders').select('*')
       .eq('provider_request_id', payment.requestId).maybeSingle();
     if (readError) throw new Error('ORDER_READ_FAILED');

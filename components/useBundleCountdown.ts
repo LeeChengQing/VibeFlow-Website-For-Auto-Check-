@@ -4,18 +4,21 @@ import { useEffect, useState } from 'react';
 import { useOfferActive, useSiteConfig } from './SiteConfigProvider';
 
 type CountdownListener = (remainingSeconds: number) => void;
+let serverAnchor=0,monotonicAnchor=0;
+export function setPricingClock(now:number){serverAnchor=now;monotonicAnchor=performance.now();}
+function serverNow(){return serverAnchor?serverAnchor+performance.now()-monotonicAnchor:0;}
 const listeners = new Map<CountdownListener, number>();
 let intervalId: number | null = null;
 
-function remainingSeconds(endsAt: number, now = Date.now()) { return Math.max(0, Math.ceil((endsAt - now) / 1000)); }
+function remainingSeconds(endsAt: number, now = serverNow()) { return Math.max(0, Math.ceil((endsAt - now) / 1000)); }
 function stopCountdown() { if (intervalId !== null) window.clearInterval(intervalId); intervalId = null; }
 function publishCountdown() {
-  const now = Date.now();
+  const now = serverNow();
   listeners.forEach((endsAt, listener) => listener(remainingSeconds(endsAt, now)));
   if (![...listeners.values()].some(endsAt => endsAt > now)) stopCountdown();
 }
 function startCountdown() {
-  if (intervalId !== null || document.hidden || ![...listeners.values()].some(endsAt => endsAt > Date.now())) return;
+  if (intervalId !== null || document.hidden || ![...listeners.values()].some(endsAt => endsAt > serverNow())) return;
   intervalId = window.setInterval(publishCountdown, 1000);
 }
 function handleVisibilityChange() { if (document.hidden) stopCountdown(); else { publishCountdown(); startCountdown(); } }

@@ -55,10 +55,16 @@ export function useLandingMotion(rootRef:RefObject<HTMLDivElement|null>,locale:s
       const onVisibility=()=>{if(document.hidden)interruptAnchor();};
       document.addEventListener('visibilitychange',onVisibility);
       const dialog=root.querySelector<HTMLDialogElement>('.guide-dialog');
-      const syncDialog=()=>{if(dialog?.open){stopTick();lenis.stop();}else lenis.start();};
+      const syncDialog=()=>{if(dialog?.open||document.documentElement.dataset.intro==='playing'){stopTick();lenis.stop();}else lenis.start();};
       const dialogObserver=new MutationObserver(syncDialog);
       if(dialog)dialogObserver.observe(dialog,{attributes:true,attributeFilter:['open']});
       syncDialog();
+      window.addEventListener('intro:done',syncDialog);
+      let heroTimeline:gsap.core.Timeline|undefined;
+      let heroRevealed=document.documentElement.dataset.intro!=='playing';
+      let heroDelay=0;
+      const revealHero=()=>{heroRevealed=true;heroDelay=.35;heroTimeline?.delay(heroDelay).play();};
+      window.addEventListener('intro:reveal',revealHero,{once:true});
 
       // Lenis uses native document scrolling, so no scrollerProxy is needed.
       const refresh=()=>{lenis.resize();ScrollTrigger.refresh();};
@@ -103,7 +109,7 @@ export function useLandingMotion(rootRef:RefObject<HTMLDivElement|null>,locale:s
       void document.fonts.ready.then(()=>{
         if(!active)return;
         context.add(()=>{
-          gsap.timeline().fromTo(root.querySelectorAll('.hero-line'),
+          heroTimeline=gsap.timeline({paused:!heroRevealed,delay:heroDelay}).fromTo(root.querySelectorAll('.hero-line'),
             {yPercent:100,opacity:0,willChange:'transform, opacity'},
             {yPercent:0,opacity:1,duration:1.5,ease:'power4.out',stagger:0.15,clearProps:'transform,opacity,willChange'});
 
@@ -134,6 +140,8 @@ export function useLandingMotion(rootRef:RefObject<HTMLDivElement|null>,locale:s
         resizeObserver.disconnect();
         window.removeEventListener('resize',scheduleRefresh);
         dialogObserver.disconnect();
+        window.removeEventListener('intro:done',syncDialog);
+        window.removeEventListener('intro:reveal',revealHero);
         root.removeEventListener('load',scheduleRefresh,true);
         root.removeEventListener('toggle',scheduleRefresh,true);
         document.removeEventListener('click',navigate,true);

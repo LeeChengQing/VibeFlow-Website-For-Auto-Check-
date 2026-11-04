@@ -3,11 +3,16 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_SITE_CONFIG } from '../lib/site-config';
-import { notificationOptions, resolveBillingPlan, SiteConfigProvider } from '../components/SiteConfigProvider';
+import { notificationOptions, resolveBillingPlan, SiteConfigProvider, useNotificationBilling } from '../components/SiteConfigProvider';
 import { LocaleProvider } from '../components/LocaleProvider';
 import { LeftHeroText } from '../components/HeroText';
 import { NotificationPriceDisplay } from '../components/NotificationPriceDisplay';
 import { BillingSegmentedControl } from '../components/BillingSegmentedControl';
+
+function BillingSelection() {
+  const { billingPlan, setBillingPlan } = useNotificationBilling();
+  return createElement(BillingSegmentedControl, { value: billingPlan, onChange: setBillingPlan, id: 'billing-test' });
+}
 
 test('hidden or disabled billing packages cannot remain the active purchase selection', () => {
   const config = structuredClone(DEFAULT_SITE_CONFIG);
@@ -29,6 +34,21 @@ test('billing tabs follow configured display order without altering the saved co
   assert.equal(JSON.stringify(config), original);
 });
 
+test('notification billing can start from the requested link selection and still respects package availability', () => {
+  const config = structuredClone(DEFAULT_SITE_CONFIG);
+  const render = (initialBillingPlan: 'semester' | 'yearly' | undefined, options = config) => renderToStaticMarkup(createElement(SiteConfigProvider, {
+    config: options, initialNow: Date.parse(options.offer.startsAt), initialBillingPlan, preview: true,
+    children: createElement(BillingSelection),
+  }));
+
+  assert.match(render('semester'), /id="billing-test-semester"[^>]*aria-selected="true"/);
+  assert.match(render('yearly'), /id="billing-test-yearly"[^>]*aria-selected="true"/);
+  assert.match(render(undefined), /id="billing-test-yearly"[^>]*aria-selected="true"/);
+
+  config.packages.find(item => item.id === 'mobile_notification')!.enabled = false;
+  assert.match(render('semester'), /id="billing-test-yearly"[^>]*aria-selected="true"/);
+});
+
 test('Hero server markup uses the configured copy and default locale', () => {
   const config = structuredClone(DEFAULT_SITE_CONFIG);
   config.hero.line1.zh = '测试标题';
@@ -46,7 +66,7 @@ test('notification prices use per-package offers only inside their configured sc
   yearly.amount = 4800;
   yearly.promotionalAmount = 3200;
   yearly.promotionEnabled = true;
-  const render = (initialNow: number) => renderToStaticMarkup(createElement(SiteConfigProvider, { config, initialNow, children:
+  const render = (initialNow: number) => renderToStaticMarkup(createElement(SiteConfigProvider, { config, initialNow, preview: true, children:
     createElement(NotificationPriceDisplay, { billingPlan: 'yearly', id: 'test-price', context: 'pricing' })
   }));
   const active = render(Date.parse(config.offer.startsAt));

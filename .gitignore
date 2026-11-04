@@ -5,6 +5,7 @@ node_modules/
 .next-admin-e2e/
 .next-admin-test/
 .next-hitpay-test/
+.next-commerce-verification/
 .env*
 !.env.example
 .local/

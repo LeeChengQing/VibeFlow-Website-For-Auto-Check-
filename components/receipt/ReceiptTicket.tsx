@@ -78,7 +78,7 @@ export function ReceiptTicket({ order, includedItems, error, onOpenSupport, onRe
     <div className={styles.surface} ref={frameRef}>
       <div ref={ticketRef} className={`${styles.ticketFrame} receipt-ticket receipt-stage`}>
         <div ref={ticketImageRef} className={styles.ticketArtwork} style={{ maxWidth: `${ticketWidth}px` }}>
-          <AdmitOneTicket name={plan.name} presenter="VibeFlow presents" event="Auto-Check" venue={venue ?? (localTest ? t('本地测试 · 无真实付款', 'LOCAL TEST · NO REAL PAYMENT') : t('HitPay 沙盒付款', 'HITPAY SANDBOX PAYMENT'))} dates={dateLabel} stubText={order.reference} watermark="PAID" width={ticketWidth} shaderEnabled={shaderEnabled} animate={shaderMoving} localTest={localTest} />
+          <AdmitOneTicket name={plan.name} presenter="VibeFlow presents" event="Auto-Check" venue={venue ?? (localTest ? t('本地测试 · 无真实付款', 'LOCAL TEST · NO REAL PAYMENT') : t('安全付款', 'SECURE PAYMENT'))} dates={dateLabel} stubText={order.reference} watermark="PAID" width={ticketWidth} shaderEnabled={shaderEnabled} animate={shaderMoving} localTest={localTest} />
         </div>
         <button className={styles.downloadButton} type="button" onClick={handleDownloadTicket} disabled={isDownloading} aria-busy={isDownloading} aria-label={t('下载数字凭证', 'Download ticket')} title={t('下载数字凭证', 'Download ticket')}>
           {isDownloading ? <LoaderCircle className={styles.spinner} size={17} aria-hidden="true" /> : <Download size={17} aria-hidden="true" />}

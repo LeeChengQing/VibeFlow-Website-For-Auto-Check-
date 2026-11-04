@@ -125,7 +125,7 @@ export function HeroPurchaseCard({ initialProduct = 'bundle' }: { initialProduct
             onClick={()=>setSelectedProduct(product)} onKeyDown={event=>handleProductKeyDown(event,index)}>
             <span className="selection-radio" aria-hidden="true"/>
             <span className={isBundle?'mini-bundle-copy':undefined}><strong>{metadata.name[locale]}</strong><small>{metadata.description[locale]}</small></span>
-            {isNotification ? !isSelected&&lowestNotificationPrice&&<b className="mini-from-price">{purchaseText(locale,'from')} {price(lowestNotificationPrice.amount)} {purchaseText(locale,lowestNotificationPrice.period==='yearly'?'perYear':'perSemester')}</b> : <span className={isBundle?'mini-bundle-price':undefined} style={{marginLeft:'auto'}}>
+            {isNotification ? !isSelected&&lowestNotificationPrice&&<b className="mini-from-price">{purchaseText(locale,'from')} {price(lowestNotificationPrice.amount)} {purchaseText(locale,lowestNotificationPrice.period==='yearly'?'perYear':'perSemester')}</b> : <span className={isBundle?'mini-bundle-price':'mini-plan-price'} style={{marginLeft:'auto'}}>
               {isBundle&&discounted&&<span>{t('限时特惠','LIMITED-TIME OFFER')}</span>}
               {discounted&&<del className="mini-bundle-original-price">{price(metadata.amount)}</del>}
               <b>{price(amount(metadata.id))}</b>

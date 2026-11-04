@@ -32,7 +32,7 @@ function licenseActions(options: { authorized?: boolean; found?: boolean; failAu
     auth: { persistSession: false }, global: { fetch: async (input, init) => {
       const url = new URL(String(input));
       requests.push({ url, method: init?.method ?? 'GET', body: JSON.parse(String(init?.body ?? 'null')) });
-      if (url.pathname !== '/rest/v1/issued_licenses' || options.dbError) {
+      if (url.pathname !== '/rest/v1/plugin_licenses' || options.dbError) {
         return new Response(JSON.stringify({ message: 'private-database-error' }), { status: 400 });
       }
       return new Response(JSON.stringify(options.found === false ? [] : [{ id: '00000000-0000-4000-8000-000000000001' }]), {
@@ -62,7 +62,7 @@ test('license revocation authenticates and targets only an active issued license
   assert.ok('ok' in await actions.revokeKeyAction(id));
   assert.equal(requests.length, 1);
   assert.equal(requests[0].method, 'PATCH');
-  assert.equal(requests[0].url.pathname, '/rest/v1/issued_licenses');
+  assert.equal(requests[0].url.pathname, '/rest/v1/plugin_licenses');
   assert.equal(requests[0].url.searchParams.get('id'), `eq.${id}`);
   assert.equal(requests[0].url.searchParams.get('status'), 'eq.active');
   assert.equal(requests[0].url.searchParams.get('select'), 'id');

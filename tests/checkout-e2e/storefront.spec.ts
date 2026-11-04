@@ -4,6 +4,18 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('vf-locale', 'en'));
 });
 
+for (const width of [1440, 402]) {
+  test(`mobile notification link selects the semester package at width ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 874 });
+    await page.goto('/?product=mobile_notification&billing=semester#hero');
+    const purchase = page.locator(width < 768 ? '.mobile-purchase' : '.hero-checkout');
+    await expect(purchase.getByRole('radio', { name: /Mobile notifications|Mobile/ })).toHaveAttribute('aria-checked', 'true');
+    if (width < 768) await purchase.getByRole('button', { name: /View notification plans/ }).click();
+    await expect(purchase.getByRole('tab', { name: /Semester/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(purchase.getByRole('tab', { name: /Yearly/ })).toHaveAttribute('aria-selected', 'false');
+  });
+}
+
 for (const [provider, host] of [['Stripe', 'checkout.stripe.com']] as const) {
 for (const width of [1440, 402]) {
 test(`bundle checkout collects email and navigates to ${provider} at width ${width}`, async ({ page }) => {

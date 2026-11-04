@@ -57,7 +57,7 @@ export async function revokeKeyAction(id: string): Promise<SiteActionResult & { 
     if (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) throw new Error('INVALID_SITE_CONFIG');
     const db = await getSiteAdminDatabase();
     // Conditional UPDATE prevents duplicate revocation and never releases stock.
-    const { data, error } = await db.from('issued_licenses').update({ status: 'revoked' })
+    const { data, error } = await db.from('plugin_licenses').update({ status: 'revoked' })
       .eq('id', id).eq('status', 'active').select('id').maybeSingle();
     if (error || !data) return { error: 'Could not revoke this license. It may already be revoked.' };
     let warning: string | undefined;

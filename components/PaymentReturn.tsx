@@ -18,11 +18,9 @@ type ConfirmedReceipt = { reference: string; plan: OrderPlanCode; amount: number
 
 export type PaymentReturnStatus = 'success' | 'processing' | 'pending' | 'not_paid' | 'unverified' | 'unavailable';
 
-export function PaymentReturn({ status, downloadExtension = false, licenseKey, licensePlan, deliveryUnavailable = false, receipt }: {
+export function PaymentReturn({ status, downloadExtension = false, deliveryUnavailable = false, receipt }: {
   status: PaymentReturnStatus;
   downloadExtension?: boolean;
-  licenseKey?: string;
-  licensePlan?: 'semester' | 'yearly';
   deliveryUnavailable?: boolean;
   receipt?: ConfirmedReceipt;
 }) {
@@ -65,7 +63,7 @@ export function PaymentReturn({ status, downloadExtension = false, licenseKey, l
     : t('付款已确认，正在准备您的订单。', 'Your payment is confirmed and your order is being prepared.');
 
   function getDownloadUrl() {
-    return new URL('/downloads/auto-check-extension.zip', window.location.origin).href;
+    return new URL('/support', window.location.origin).href;
   }
 
   async function copyDownloadLink() {
@@ -113,8 +111,8 @@ export function PaymentReturn({ status, downloadExtension = false, licenseKey, l
         {downloadExtension && status === 'success' && <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-5 text-left">
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-white/55">{t('扩展程序下载', 'Extension download')}</p>
           <div className="flex flex-col items-start gap-3">
-            <a href="/downloads/auto-check-extension.zip" download className="inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-300 px-7 text-base font-bold text-[#07130e] shadow-lg shadow-emerald-950/40 transition-colors hover:bg-emerald-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-200">
-              {t('下载扩展程序（.zip）', 'Download Extension (.zip)')}
+            <a href="/support" className="inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-300 px-7 text-base font-bold text-[#07130e] shadow-lg shadow-emerald-950/40 transition-colors hover:bg-emerald-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-200">
+              {t('查看购买支持', 'Purchase support')}
             </a>
             <button type="button" onClick={copyDownloadLink} className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
               {t('复制下载链接', 'Copy Download Link')}
@@ -132,7 +130,7 @@ export function PaymentReturn({ status, downloadExtension = false, licenseKey, l
             includedItems={includedItems} error={licenseError} onOpenSupport={`/support?reference=${encodeURIComponent(receipt.reference)}`}
             onRefresh={() => router.refresh()} refreshing={false} localTest={false}
             paymentLabel={providerName} venue={providerVenue} maskedEmail={receipt.maskedEmail}
-            licenseKey={licenseKey} licensePlan={licensePlan} />
+            />
         </aside>}
       </m.div>
     </section>

@@ -13,6 +13,9 @@ export function PerformanceRuntime(){
   useEffect(()=>{
     const reduced=matchMedia('(prefers-reduced-motion:reduce)'),coarse=matchMedia('(any-pointer:coarse)');
     let runtimeLow=false,previous=0,windowStart=0,total=0,count=0,slowWindows=0;
+    let ignoreUntil=0;
+    const introDone=()=>{ignoreUntil=performance.now()+1000;};
+    window.addEventListener('intro:done',introDone);
     let releaseMonitor:(()=>void)|undefined,pausedTimeline=false;
     const pausedAnimations=new Set<Animation>();
     const click=(event:MouseEvent)=>{
@@ -29,6 +32,7 @@ export function PerformanceRuntime(){
     };
     const syncPolicy=()=>{const reason=deviceEffectsReason();setEffectsPolicy(!!reason||runtimeLow,reason||(runtimeLow?'runtime':''));};
     const sample=(now:number)=>{
+      if(document.documentElement.dataset.intro==='playing'||performance.now()<ignoreUntil){previous=0;windowStart=0;total=0;count=0;slowWindows=0;return;}
       if(previous){total+=now-previous;count++;}previous=now;
       if(!windowStart)windowStart=now;
       if(now-windowStart<1000||!count)return;
@@ -49,7 +53,7 @@ export function PerformanceRuntime(){
     syncPolicy();releaseMonitor=subscribeAnimationFrame(sample);
     document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);
     reduced.addEventListener('change',syncPolicy);coarse.addEventListener('change',syncPolicy);document.addEventListener('visibilitychange',visibility);
-    return()=>{releaseMonitor?.();document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);reduced.removeEventListener('change',syncPolicy);coarse.removeEventListener('change',syncPolicy);document.removeEventListener('visibilitychange',visibility);if(pausedTimeline)gsap.globalTimeline.resume();pausedAnimations.clear();};
+    return()=>{window.removeEventListener('intro:done',introDone);releaseMonitor?.();document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);reduced.removeEventListener('change',syncPolicy);coarse.removeEventListener('change',syncPolicy);document.removeEventListener('visibilitychange',visibility);if(pausedTimeline)gsap.globalTimeline.resume();pausedAnimations.clear();};
   },[]);
   return null;
 }

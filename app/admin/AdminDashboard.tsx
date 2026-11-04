@@ -113,13 +113,13 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
         <div>
           <p className="font-mono text-[10px] tracking-widest text-cyan-200">NEW BATCH</p>
           <h2 className="mt-2! text-xl font-semibold tracking-tight">Provision activation keys</h2>
-          <p className="mt-2! max-w-sm text-sm leading-6 text-white/70">Generate up to 100 keys. Save the codes immediately; they cannot be recovered later.</p>
+          <p className="mt-2! max-w-sm text-sm leading-6 text-white/70">Generate up to 100 extension keys. Save the codes now; this panel shows them once.</p>
         </div>
         <form action={generate} className="grid gap-3 sm:grid-cols-[1fr_100px_auto] sm:items-end">
           <div>
             <label htmlFor="provision-plan" className="mb-2 block text-xs text-white/70">Provisioning plan</label>
-            <select id="provision-plan" name="plan" defaultValue="bundle" disabled={pending} className={field}>
-              {Object.entries(PLAN_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            <select id="provision-plan" name="plan" defaultValue="extension" disabled={pending} className={field}>
+              {Object.entries(PLAN_LABELS).filter(([value])=>['extension','internal_check'].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
           <div>
@@ -175,7 +175,7 @@ export function AdminDashboard({ data, showLocalPreview, embedded = false }: { d
           </nav>
         </footer>
       </section>
-      <p className="mt-5! font-mono text-[10px] leading-5 text-white/40">HASH-ONLY STORAGE · ORIGINAL CODES ARE SHOWN ONCE · TIMES IN MYT (UTC+08:00)</p>
+      <p className="mt-5! font-mono text-[10px] leading-5 text-white/40">PRIVATE SERVER STORAGE · ORIGINAL CODES ARE SHOWN ONCE · TIMES IN MYT (UTC+08:00)</p>
     </>}
     <GeneratedKeysModal batch={batch} onDiscard={() => setBatch(null)} />
     <dialog ref={revokeDialog} aria-labelledby="revoke-title" onClose={() => setRevokeId(null)} onCancel={event => { if (pending) event.preventDefault(); }} className="fixed inset-0 m-auto w-[calc(100%_-_2rem)] max-w-md rounded-2xl border border-white/15 bg-zinc-950 p-7 text-white backdrop:bg-black/80 backdrop:backdrop-blur-sm">

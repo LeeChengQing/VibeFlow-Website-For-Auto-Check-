@@ -4,7 +4,6 @@ import { headers } from 'next/headers';
 import { PaymentReturn, type PaymentReturnStatus } from '@/components/PaymentReturn';
 import { MinimalPaymentReturn } from '@/components/MinimalPaymentReturn';
 import { isHitPayUUID } from '@/lib/hitpay';
-import { decryptLicenseKey } from '@/lib/license-key-encryption';
 import { getCommerceDatabase } from '@/lib/supabase/commerce';
 import type { OrderPlanCode } from '@/lib/plans';
 
@@ -42,14 +41,16 @@ export default async function SuccessPage({ searchParams }: {
   const params = await searchParams;
   const orderId = firstParam(params.order_id);
   const reference = firstParam(params.reference);
+  if(process.env.NODE_ENV==='production'||process.env.LOCAL_DEMO!=='true'){
+    if(isHitPayUUID(orderId)||isHitPayUUID(reference))redirect('/purchase?order_id='+encodeURIComponent(orderId??reference!));
+    redirect('/');
+  }
   const billcode = firstParam(params.billcode);
   const providerRequestId = billcode ?? firstParam(params.payment_request_id) ?? firstParam(params.session_id);
   const headersList = await headers();
   const minimalMobileReturn = isGatewayReturn(params) && isMobileWebView(headersList.get('user-agent') ?? '');
   let status: PaymentReturnStatus = 'unverified';
   let downloadExtension = false;
-  let licenseKey: string | undefined;
-  let licensePlan: 'semester' | 'yearly' | undefined;
   let deliveryUnavailable = false;
   let receipt: { reference: string; plan: OrderPlanCode; amount: number; maskedEmail: string; paidAt: string; paymentProvider: 'hitpay' | 'stripe' | 'toyyibpay' } | undefined;
 
@@ -85,33 +86,7 @@ export default async function SuccessPage({ searchParams }: {
           paymentProvider: order.payment_provider as 'hitpay' | 'stripe' | 'toyyibpay',
         };
 
-        if (order.plan === 'bundle' || order.plan === 'semester' || order.plan === 'yearly') {
-          const expectedPlan = order.plan === 'bundle' ? 'semester' : order.plan;
-          try {
-            const { data: license, error: licenseError } = await supabase.from('issued_licenses')
-              .select('inventory_id,plan_type')
-              .eq('order_id', order.id).eq('status', 'active')
-              .abortSignal(AbortSignal.timeout(4000)).maybeSingle();
-            if (licenseError || !license || license.plan_type !== expectedPlan) {
-              deliveryUnavailable = true;
-            } else {
-              const { data: inventory, error: inventoryError } = await supabase.from('key_inventory')
-                .select('encrypted_key,key_hash')
-                .eq('id', license.inventory_id).eq('status', 'assigned')
-                .abortSignal(AbortSignal.timeout(4000)).maybeSingle();
-              if (inventoryError || !inventory?.encrypted_key || !inventory.key_hash) {
-                deliveryUnavailable = true;
-              } else {
-                licenseKey = decryptLicenseKey(inventory.encrypted_key, inventory.key_hash);
-                licensePlan = expectedPlan;
-              }
-            }
-          } catch {
-            deliveryUnavailable = true;
-            licenseKey = undefined;
-            licensePlan = undefined;
-          }
-        }
+        deliveryUnavailable = ['bundle','semester','yearly'].includes(order.plan);
       } else if (order?.payment_confirmed_at) {
         status = 'processing';
       }
@@ -126,5 +101,5 @@ export default async function SuccessPage({ searchParams }: {
   if (minimalMobileReturn) return <MinimalPaymentReturn status={status} />;
 
   return <PaymentReturn status={status} downloadExtension={downloadExtension}
-    licenseKey={licenseKey} licensePlan={licensePlan} deliveryUnavailable={deliveryUnavailable} receipt={receipt} />;
+    deliveryUnavailable={deliveryUnavailable} receipt={receipt} />;
 }
