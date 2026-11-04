@@ -210,18 +210,18 @@ export function BuyButton({
 
       {open && (available || isRedirecting) && createPortal(
         <div
-          className="checkout-modal fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
+          className="checkout-modal fixed inset-0 z-[1000] flex items-center justify-center overflow-hidden bg-black/50 p-4 backdrop-blur-sm"
           onClick={event => { if (event.target === event.currentTarget) closeModal(); }}
         >
           <div
             ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={dialogTitleId}
-            className="checkout-modal-panel w-full max-w-md rounded-2xl border border-white/15 bg-[#111317] p-6 text-white shadow-2xl sm:p-8"
+            className="checkout-modal-panel flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#111317] p-5 text-white shadow-2xl md:p-6 [@media(max-height:750px)]:p-5"
           >
             {isRedirecting ? (
               <m.div
                 initial={{ opacity: reducedMotion ? 1 : 0 }} animate={{ opacity: 1 }}
                 transition={{ duration: reducedMotion ? 0 : 0.2 }}
-                className="flex min-h-64 flex-col items-center justify-center gap-5 py-6 text-center"
+                className="flex min-h-0 flex-col items-center gap-5 overflow-y-auto py-6 text-center"
               >
                 <div className="relative flex size-20 items-center justify-center rounded-full border border-white/10 bg-white/5" aria-hidden="true">
                   <Bouncy size={45} speed={1.75} color="white" />
@@ -234,11 +234,14 @@ export function BuyButton({
                   {t(`${redirectCountdown} 秒后跳转`, `Redirecting in ${redirectCountdown}s`)}
                 </p>
               </m.div>
-            ) : <form id={formId} className="form" onSubmit={buy} aria-busy={busy}>
+            ) : <form id={formId} className="form checkout-modal-form" onSubmit={buy} aria-busy={busy}>
+              <header className="flex shrink-0 flex-col gap-3">
               <p>{t('当前价格','Current price')} · {price(packagePrice(config,plan))}</p>
               <h2 id={dialogTitleId} className="text-xl font-semibold">
                 {t('完成购买', 'Complete your purchase')}
               </h2>
+              </header>
+              <div className="checkout-modal-fields">
               <label htmlFor={emailId}>
                 {t('接收邮箱', 'Delivery email')}
                 <input
@@ -267,6 +270,8 @@ export function BuyButton({
                 />
               </div>
               {error && <p id={errorId} className="form-error" role="alert">{error}</p>}
+              </div>
+              <footer className="flex shrink-0 flex-col gap-3">
               <button type="submit" className={className} disabled={busy || !termsAccepted}>
                 {busy ? t('正在打开…', 'Opening…') : t('前往付款', 'Continue to payment')}
                 {busy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <span aria-hidden="true">↗</span>}
@@ -274,6 +279,7 @@ export function BuyButton({
               <button type="button" className="button secondary" disabled={busy} onClick={closeModal}>
                 {t('取消', 'Cancel')}
               </button>
+              </footer>
             </form>}
           </div>
         </div>,

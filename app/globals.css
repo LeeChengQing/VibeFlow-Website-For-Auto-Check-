@@ -374,3 +374,8 @@ html[data-perf="low"] .orb-animated{visibility:hidden}
 .hero-checkout .buy-action .button.primary:not(:disabled){background:linear-gradient(135deg,var(--accent-2),var(--accent));border-color:transparent;color:#032a3a}
 
 .mini-plan-price{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:104px}.mini-plan-price>b{font-size:clamp(18px,1.45vw,20px);font-weight:700;font-variant-numeric:tabular-nums}
+.checkout-modal .checkout-modal-form{display:flex;flex-direction:column;min-height:0;gap:20px}
+.checkout-modal-fields{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:20px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#ffffff40 transparent;padding:4px;margin:-4px}
+.checkout-modal-fields::-webkit-scrollbar{width:4px}
+.checkout-modal-fields::-webkit-scrollbar-thumb{background:#ffffff40;border-radius:999px}
+@media(max-height:750px){.checkout-modal .checkout-modal-form,.checkout-modal-fields{gap:14px}.checkout-modal .form label{gap:6px}.checkout-modal .form input:not([type=radio]):not([type=checkbox]){padding:10px 13px}.checkout-modal .payment-method-card{padding:10px}}
