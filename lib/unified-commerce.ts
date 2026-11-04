@@ -54,7 +54,8 @@ export async function createUnifiedCheckout(request:Request,provider:'stripe'|'t
     const inserted=await db.from('payment_orders').insert(row);if(inserted.error)fail('ORDER_CREATE_FAILED',503);
     let providerId:string,url:string;
     if(provider==='stripe') {
-      const session=await getStripe().checkout.sessions.create({mode:'payment',allowed_payment_method_types:['card','fpx'],...(email?{customer_email:email}:{}),client_reference_id:orderId,metadata:{order_id:orderId},payment_intent_data:{metadata:{order_id:orderId}},line_items:[{quantity:1,price_data:{currency:'myr',unit_amount:price,product_data:{name:config.packages.find(p=>p.id===mapping[input.plan])!.name.en}}}],success_url:`${origin}/success?order_id=${orderId}`,cancel_url:`${origin}/#pricing`},{idempotencyKey:'checkout-'+orderId});
+      const session=await getStripe().checkout.sessions.create({mode:'payment',allowed_payment_method_types:['card','fpx','alipay'],...(email?{customer_email:email}:{}),client_reference_id:orderId,metadata:{order_id:orderId},payment_intent_data:{metadata:{order_id:orderId}},line_items:[{quantity:1,price_data:{currency:'myr',unit_amount:price,product_data:{name:config.packages.find(p=>p.id===mapping[input.plan])!.name.en}}}],success_url:`${origin}/success?order_id=${orderId}`,cancel_url:`${origin}/#pricing`},{idempotencyKey:'checkout-'+orderId});
+      console.info('[checkout-methods]',{provider:'stripe',methods:session.payment_method_types});
       providerId=session.id;url=session.url??'';
       if(!url.startsWith('https://checkout.stripe.com/'))fail('PAYMENT_PROVIDER_UNAVAILABLE',502);
     } else {

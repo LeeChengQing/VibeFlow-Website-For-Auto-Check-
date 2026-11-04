@@ -22,7 +22,6 @@ export function PaymentMethodSelector({ value, onChange, disabled, name, availab
           onChange={() => { if (method.enabled) onChange(method.id); }} />
         <span className={styles.copy}>
           <span className={styles.title}>{method.label}</span>
-          <span className={styles.provider}>{t(`由 ${method.provider} 提供支持`, `Powered by ${method.provider}`)}</span>
           {!method.enabled && <span className={styles.availability}>{t('暂不可用', 'Temporarily unavailable')}</span>}
         </span>
       </label>)}

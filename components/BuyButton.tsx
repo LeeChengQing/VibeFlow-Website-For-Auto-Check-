@@ -233,7 +233,6 @@ export function BuyButton({
                 <p className="text-sm tabular-nums text-white/60" aria-live="polite" aria-atomic="true">
                   {t(`${redirectCountdown} 秒后跳转`, `Redirecting in ${redirectCountdown}s`)}
                 </p>
-                <p className="text-xs text-white/40">{t(`由 ${selectedMethod.provider} 提供安全付款`, `Secure checkout by ${selectedMethod.provider}`)}</p>
               </m.div>
             ) : <form id={formId} className="form" onSubmit={buy} aria-busy={busy}>
               <p>{t('当前价格','Current price')} · {price(packagePrice(config,plan))}</p>
@@ -269,7 +268,7 @@ export function BuyButton({
               </div>
               {error && <p id={errorId} className="form-error" role="alert">{error}</p>}
               <button type="submit" className={className} disabled={busy || !termsAccepted}>
-                {busy ? t('正在打开…', 'Opening…') : t(`前往 ${selectedMethod.provider} 付款`, `Continue to ${selectedMethod.provider}`)}
+                {busy ? t('正在打开…', 'Opening…') : t('前往付款', 'Continue to payment')}
                 {busy ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <span aria-hidden="true">↗</span>}
               </button>
               <button type="button" className="button secondary" disabled={busy} onClick={closeModal}>

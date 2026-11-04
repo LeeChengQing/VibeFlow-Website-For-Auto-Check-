@@ -3,11 +3,11 @@ export type PaymentMethod = 'stripe' | 'toyyibpay';
 export const paymentMethods = [
   {
     id: 'stripe', provider: 'Stripe', endpoint: '/api/checkout/stripe', enabled: true,
-    label: 'Credit / Debit Card',
+    label: 'Bank, Alipay',
   },
   {
     id: 'toyyibpay', provider: 'ToyyibPay', endpoint: '/api/checkout/toyyibpay', enabled: true,
-    label: 'Online Banking (FPX)',
+    label: 'Touch n go',
   },
 ] as const;
 
