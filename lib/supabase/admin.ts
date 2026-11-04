@@ -3,7 +3,7 @@ import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdminSession } from '@/lib/admin-auth';
 
-export type ActivationKeyPlan = 'bundle' | 'extension' | 'semester' | 'yearly' | 'internal_check';
+export type ActivationKeyPlan = 'bundle' | 'extension' | 'semester' | 'yearly' | 'internal_check' | 'core';
 export type KeyInventoryStatus = 'available' | 'assigned';
 export type IssuedLicenseStatus = 'active' | 'revoked';
 export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded';
@@ -42,14 +42,22 @@ export type OrderRow = {
   provider_request_id: string | null;
   payment_confirmed_at: string | null;
   fulfillment_error: 'INVENTORY_EXHAUSTED' | null;
+  order_access_token_hash?: string | null;
+  release_asset_id?: string | null;
+  terms_version?: string | null;
+  terms_accepted_at?: string | null;
+  consent_ip_hash?: string | null;
+  consent_ua?: string | null;
+  channel?: string | null;
+  public_ref?: string | null;
+  refunded_at?: string | null;
 };
 
 export type KeyInventoryInsert = Pick<KeyInventoryRow, 'key_hash' | 'encrypted_key' | 'plan_type'> &
   Partial<Pick<KeyInventoryRow, 'id' | 'status'>>;
 export type IssuedLicenseInsert = Pick<IssuedLicenseRow, 'order_id' | 'inventory_id' | 'buyer_email' | 'plan_type'> &
   Partial<Pick<IssuedLicenseRow, 'id' | 'device_id' | 'status' | 'activated_at' | 'expires_at'>>;
-export type OrderInsert = Omit<OrderRow, 'id' | 'status' | 'provider_payment_id' | 'paid_at' | 'provider_request_id' | 'payment_confirmed_at' | 'fulfillment_error'> &
-  Partial<Pick<OrderRow, 'id' | 'status' | 'provider_payment_id' | 'paid_at' | 'provider_request_id' | 'payment_confirmed_at' | 'fulfillment_error'>>;
+export type OrderInsert = Partial<OrderRow> & Pick<OrderRow, 'reference' | 'buyer_email' | 'plan' | 'amount_minor' | 'currency' | 'payment_provider'>;
 
 export type AdminDatabase = {
   public: {

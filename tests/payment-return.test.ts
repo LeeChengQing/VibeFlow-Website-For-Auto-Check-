@@ -30,12 +30,12 @@ function fixture() {
   const desktop = loadServerModule<any>('components/PaymentReturn.tsx', dependencies, globals).PaymentReturn;
   const mobile = loadServerModule<any>('components/MinimalPaymentReturn.tsx', dependencies, globals).MinimalPaymentReturn;
   return {
-    render(status: PaymentReturnStatus, variant: 'desktop' | 'mobile', locale: 'en' | 'zh' = 'en') {
+    render(status: PaymentReturnStatus, variant: 'desktop' | 'mobile', locale: 'en' | 'zh' = 'en', receipt?: any) {
       effects.length = 0;
       const html = renderToStaticMarkup(React.createElement(LocaleProvider, {
         defaultLocale: locale, persist: false,
         children: React.createElement(variant === 'desktop' ? desktop : mobile, {
-          status, downloadExtension: true, licenseKey: 'SHOULD-NOT-LEAK',
+          status, downloadExtension: true, licenseKey: 'SHOULD-NOT-LEAK', receipt,
         }),
       }));
       // LocaleProvider's DOM effects are not intercepted, only target effects.
@@ -84,3 +84,26 @@ test('verified payments retain success or fulfillment processing rather than a f
     }
   }
 });
+
+test('receipt renders correctly across all 4 plans in both English and Chinese without throwing', () => {
+  const plans = ['extension', 'semester', 'yearly', 'bundle'] as const;
+  for (const plan of plans) {
+    for (const locale of ['en', 'zh'] as const) {
+      const receipt = {
+        reference: 'VF-TEST-1234',
+        plan,
+        amount: 3000,
+        maskedEmail: 't•••••@example.com',
+        paidAt: new Date().toISOString(),
+        paymentProvider: 'stripe' as const,
+      };
+
+      const f = fixture();
+      const html = f.render('success', 'desktop', locale, receipt);
+      assert.ok(html.length > 0);
+      assert.doesNotMatch(html, /Payment failed/);
+      assert.match(html, locale === 'zh' ? /付款成功/ : /Payment Successful/);
+    }
+  }
+});
+

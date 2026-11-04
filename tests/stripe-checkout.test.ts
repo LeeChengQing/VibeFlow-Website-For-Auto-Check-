@@ -103,7 +103,9 @@ test('Stripe sessions use server prices, normalize email and enable card plus FP
     assert.equal(provider.line_items[0].price_data.unit_amount, packagePrice(DEFAULT_SITE_CONFIG, catalog));
     assert.equal(provider.line_items[0].price_data.currency, 'myr');
     assert.deepEqual(Array.from(provider.allowed_payment_method_types), ['card', 'fpx']);
-    assert.equal(provider.success_url, `https://auto-check.example/success?order_id=${orderId}`);
+    assert.ok(provider.success_url.startsWith(`https://auto-check.example/success?order_id=${orderId}`));
+    assert.ok(provider.success_url.includes('&token='));
+    assert.ok(f.row.order_access_token_hash);
     assert.equal(provider.cancel_url, 'https://auto-check.example/#pricing');
     assert.equal(settings.idempotencyKey, `checkout-${orderId}`);
   }
