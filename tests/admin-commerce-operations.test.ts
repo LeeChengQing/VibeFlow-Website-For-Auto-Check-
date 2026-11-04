@@ -1,130 +1,71 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { PGlite } from '@electric-sql/pglite';
+import { test } from 'node:test';
 import { loadServerModule } from './helpers/server-module';
 
-async function migrateAll(db: PGlite) {
-  await db.exec(`
-    create role anon;
-    create role authenticated;
-    create role service_role bypassrls;
-    grant usage on schema public to anon, authenticated, service_role;
-    alter default privileges in schema public
-      grant all on tables to public, anon, authenticated, service_role;
-    create schema storage;
-    create table storage.buckets (
-      id text primary key, name text, public boolean,
-      file_size_limit bigint, allowed_mime_types text[]
-    );
-  `);
-
-  const migrationFiles = readdirSync('supabase/migrations')
-    .filter(f => f.endsWith('.sql'))
-    .sort();
-
-  for (const file of migrationFiles) {
-    const sql = readFileSync(`supabase/migrations/${file}`, 'utf8');
-    await db.exec(sql);
-  }
+const rows = [
+  { id: '00000000-0000-4000-8000-000000000001', buyer_email: 'one@example.com', plan: 'extension', amount_minor: 1000, currency: 'MYR', status: 'paid', payment_provider: 'stripe', created_at: '2026-01-01', paid_at: '2026-01-02', refunded_at: null, refund_review: false, verification_only: false },
+  { id: '00000000-0000-4000-8000-000000000002', buyer_email: 'two@example.com', plan: 'bundle', amount_minor: 2000, currency: 'MYR', status: 'pending', payment_provider: 'stripe', created_at: '2026-01-02', paid_at: null, refunded_at: null, refund_review: false, verification_only: false },
+  { id: '00000000-0000-4000-8000-000000000003', buyer_email: 'three@example.com', plan: 'bundle', amount_minor: 3000, currency: 'MYR', status: 'refunded', payment_provider: 'stripe', created_at: '2026-01-03', paid_at: '2026-01-03', refunded_at: '2026-01-04', refund_review: false, verification_only: false },
+  { id: '00000000-0000-4000-8000-000000000004', buyer_email: 'test@example.com', plan: 'extension', amount_minor: 9000, currency: 'MYR', status: 'paid', payment_provider: 'stripe', created_at: '2026-01-04', paid_at: '2026-01-04', refunded_at: null, refund_review: false, verification_only: true },
+];
+function setup(options: { authorized?: boolean; failure?: boolean } = {}) {
+  let reads = 0;
+  const db = { from(table: string) {
+    assert.equal(table, 'payment_orders'); reads++;
+    let filtered = [...rows];
+    const query = {
+      select(columns: string) { assert.doesNotMatch(columns, /token/); return query; },
+      eq(key: string, value: string) { filtered = filtered.filter(row => row[key as keyof typeof row] === value); return query; },
+      or(value: string) { const needle = value.split('%')[1].toLowerCase(); filtered = filtered.filter(row => row.buyer_email.includes(needle) || row.plan.includes(needle)); return query; },
+      order() { return query; },
+      async range(start: number, end: number) { return options.failure ? { data: null, count: null, error: { message: 'secret' } } : { data: filtered.slice(start, end + 1), count: filtered.length, error: null }; },
+    };
+    return query;
+  } };
+  const module = loadServerModule<typeof import('../lib/site-operations')>('lib/site-operations.ts', {
+    '@/lib/admin-auth': { requireAdminSession: async () => { if (options.authorized === false) throw new Error('UNAUTHORIZED'); } },
+    '@/lib/admin-local': { isLocalAdminPreview: async () => false },
+    '@/lib/supabase/commerce': { isCommerceConfigured: () => true, getCommerceDatabase: () => db },
+  });
+  return { module, reads: () => reads };
 }
 
-test('commerce site operations list data and execute real database mutations', async () => {
-  const db = new PGlite();
-  await migrateAll(db);
+test('production metrics exclude verification orders and refunded or pending amounts', async () => {
+  const { module } = setup();
+  const data = await module.getSiteOperations();
+  assert.equal(data.source, 'production');
+  assert.equal(data.support, 'unconfigured');
+  assert.equal(data.metrics?.total, 3);
+  assert.equal(data.metrics?.paid, 1);
+  assert.equal(data.metrics?.pending, 1);
+  assert.equal(data.metrics?.refunded, 1);
+  assert.equal(data.metrics?.verification, 1);
+  assert.equal(data.metrics?.revenue.MYR, 1000);
+  assert.equal(data.productionPage?.orders[0].buyer_email, 'one@example.com');
+});
 
-  const orderId = '00000000-0000-4000-8000-000000000030';
-  const invId = '00000000-0000-4000-8000-000000000031';
-  const licId = '00000000-0000-4000-8000-000000000032';
-  const keyHash = 'e'.repeat(64);
+test('production filtering and pagination run in the database query', async () => {
+  const { module } = setup();
+  const filtered = await module.getProductionOrders({ status: 'pending', search: 'two' });
+  assert.equal(filtered.count, 1);
+  assert.equal(filtered.orders[0].id, rows[1].id);
+  const second = await module.getProductionOrders({ page: 2 });
+  assert.equal(second.page, 2);
+  assert.equal(second.orders.length, 0);
+});
 
-  // Seed inventory, order, license
-  await db.query(`
-    insert into public.key_inventory (id, key_hash, plan_type, status, encrypted_key)
-    values ($1, $2, 'core', 'assigned', 'v1.enc.key')
-  `, [invId, keyHash]);
+test('authorization precedes reads and production actions are disabled', async () => {
+  const denied = setup({ authorized: false });
+  await assert.rejects(denied.module.getProductionOrders(), /UNAUTHORIZED/);
+  assert.equal(denied.reads(), 0);
+  const { module } = setup();
+  for (const action of ['refund', 'resend', 'generate_recovery_link']) await assert.rejects(module.runSiteOperation(action, rows[0].id), /LOCAL_ONLY/);
+});
 
-  await db.query(`
-    insert into public.orders (
-      id, reference, buyer_email, plan, currency, amount_minor,
-      payment_provider, provider_payment_id, status
-    ) values (
-      $1, 'VF-ADMIN-030', 'customer@example.com', 'extension', 'MYR', 3900,
-      'stripe', 'pi_test_admin_30', 'paid'
-    )
-  `, [orderId]);
-
-  await db.query(`
-    insert into public.issued_licenses (id, order_id, inventory_id, buyer_email, plan_type, status)
-    values ($1, $2, $3, 'customer@example.com', 'core', 'active')
-  `, [licId, orderId, invId]);
-
-  // Seed ticket
-  const ticketId = '00000000-0000-4000-8000-000000000040';
-  await db.query(`
-    insert into public.support_tickets (
-      id, reference, email, subject, status, access_token_hash, created_at, updated_at
-    ) values ($1, 'TK-TEST-30', 'customer@example.com', 'Help please', 'open', 'dummy_hash', now(), now())
-  `, [ticketId]);
-
-  await db.query(`
-    insert into public.support_messages (id, ticket_id, sender, message, created_at)
-    values ('00000000-0000-4000-8000-000000000041', $1, 'customer', 'Initial message', now())
-  `, [ticketId]);
-
-  const opsModule = loadServerModule<any>('lib/site-operations.ts', {
-    'server-only': {},
-    '@/lib/admin-auth': { requireAdminSession: async () => ({ issuedAt: 1, expiresAt: 9999999999 }) },
-    '@/lib/admin-local': { isLocalAdminPreview: async () => false },
-    '@/lib/supabase/commerce': { getCommerceDatabase: () => db, isCommerceConfigured: () => true },
-  }, {
-    Request, Response, AbortSignal,
-    process: { env: { NODE_ENV: 'production' } },
-  });
-
-  // 1. getSiteOperations returns real orders and tickets
-  const data = await opsModule.getSiteOperations();
-  assert.equal(data.local, false);
-  assert.equal(data.orders.length, 1);
-  assert.equal(data.orders[0].reference, 'VF-ADMIN-030');
-  assert.equal(data.tickets.length, 1);
-  assert.equal(data.tickets[0].reference, 'TK-TEST-30');
-
-  // 2. runSiteOperation 'reply'
-  const replyResult = await opsModule.runSiteOperation('reply', ticketId, { message: 'Admin reply here.' });
-  assert.ok(replyResult.includes('Reply saved'));
-
-  const ticketMessages = (await db.query<any>(`select sender, message from public.support_messages where ticket_id = $1 order by created_at asc`, [ticketId])).rows;
-  assert.equal(ticketMessages.length, 2);
-  assert.equal(ticketMessages[1].sender, 'admin');
-  assert.equal(ticketMessages[1].message, 'Admin reply here.');
-
-  // 3. runSiteOperation 'close'
-  const closeResult = await opsModule.runSiteOperation('close', ticketId);
-  assert.ok(closeResult.includes('closed'));
-  const closedTicket = (await db.query<any>(`select status from public.support_tickets where id = $1`, [ticketId])).rows[0];
-  assert.equal(closedTicket.status, 'closed');
-
-  // 4. runSiteOperation 'reopen'
-  const reopenResult = await opsModule.runSiteOperation('reopen', ticketId);
-  assert.ok(reopenResult.includes('reopened'));
-  const reopenedTicket = (await db.query<any>(`select status from public.support_tickets where id = $1`, [ticketId])).rows[0];
-  assert.equal(reopenedTicket.status, 'open');
-
-  // 5. runSiteOperation 'refund'
-  const refundResult = await opsModule.runSiteOperation('refund', orderId);
-  assert.ok(refundResult.includes('Refund processed'));
-
-  const refundedOrder = (await db.query<any>(`select status from public.orders where id = $1`, [orderId])).rows[0];
-  assert.equal(refundedOrder.status, 'refunded');
-
-  const revokedLicense = (await db.query<any>(`select status from public.issued_licenses where id = $1`, [licId])).rows[0];
-  assert.equal(revokedLicense.status, 'revoked');
-
-  const revokedInv = (await db.query<any>(`select status from public.key_inventory where id = $1`, [invId])).rows[0];
-  assert.equal(revokedInv.status, 'revoked');
-
-  // 6. runSiteOperation 'resend'
-  const resendResult = await opsModule.runSiteOperation('resend', orderId, { email: 'updated@example.com' });
-  assert.ok(resendResult.includes('delivery enqueued') || resendResult.includes('refreshed'));
+test('database errors remain distinct from empty order lists', async () => {
+  const { module } = setup({ failure: true });
+  await assert.rejects(module.getProductionOrders(), /ORDERS_UNAVAILABLE/);
+  const result = await module.getSiteOperations();
+  assert.match(result.error || '', /could not be loaded/);
+  assert.doesNotMatch(result.error || '', /secret/);
 });

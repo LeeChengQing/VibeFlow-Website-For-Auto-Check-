@@ -32,7 +32,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   catch { /* Preserve the dashboard instance and one-time modal during read failures. */ }
   const inventory = <><Link href="/admin/pricing" className="button secondary">价格与优惠排期</Link><AdminDashboard data={data} showLocalPreview={showLocalPreview} embedded /></>;
   let management = null;
-  let operations = { local: false, orders: [], tickets: [] } as Awaited<ReturnType<typeof getSiteOperations>>;
+  let operations = { local: false, source: 'unavailable', support: 'unavailable', orders: [], tickets: [], error: 'Order data could not be loaded. Refresh and try again.' } as Awaited<ReturnType<typeof getSiteOperations>>;
   const [settingsResult, operationsResult] = await Promise.allSettled([getSiteManagementData(), getSiteOperations()]);
   if (settingsResult.status === 'fulfilled') management = settingsResult.value;
   if (operationsResult.status === 'fulfilled') operations = operationsResult.value;

@@ -1,12 +1,48 @@
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { isLocalAdminPreview } from '@/lib/admin-local';
-import { generateOrderAccessToken } from '@/lib/order-access-token';
 import type { Order, Ticket } from '@/lib/types';
 
-export type SiteOperationsData = { local: boolean; orders: Order[]; tickets: Ticket[] };
+export type ProductionOrder = { id: string; buyer_email: string | null; plan: string; amount_minor: number; currency: string; status: string; payment_provider: string; created_at: string; paid_at: string | null; refunded_at: string | null; refund_review: boolean; verification_only: boolean };
+export type ProductionMetrics = { total: number; pending: number; paid: number; cancelled: number; refunded: number; verification: number; revenue: Record<string, number> };
+export type SiteOperationsData = { local: boolean; source: 'local' | 'production' | 'unavailable'; orders: Order[]; tickets: Ticket[]; support: 'local' | 'unconfigured' | 'unavailable'; metrics?: ProductionMetrics; productionPage?: ProductionOrderPage; error?: string };
+export type ProductionOrderPage = { orders: ProductionOrder[]; count: number; page: number };
+const orderColumns = 'id,buyer_email,plan,amount_minor,currency,status,payment_provider,created_at,paid_at,refunded_at,refund_review,verification_only';
+
+export async function getProductionOrders(input: { search?: string; status?: string; page?: number } = {}): Promise<ProductionOrderPage> {
+  await requireAdminSession();
+  const db = getCommerceDb();
+  if (!db || typeof db.from !== 'function') throw new Error('ORDERS_UNAVAILABLE');
+  const page = Math.max(1, Math.min(100000, Math.floor(Number(input.page) || 1)));
+  const status = ['pending', 'paid', 'cancelled', 'refunded'].includes(input.status || '') ? input.status : '';
+  const search = String(input.search || '').trim().slice(0, 100).replace(/[^\w@.\-+]/g, '');
+  let query = db.from('payment_orders').select(orderColumns, { count: 'exact' });
+  if (status) query = query.eq('status', status);
+  if (search) query = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search) ? query.eq('id', search) : query.or(`buyer_email.ilike.%${search}%,plan.ilike.%${search}%`);
+  const { data, error, count } = await query.order('created_at', { ascending: false }).order('id', { ascending: false }).range((page - 1) * 20, page * 20 - 1);
+  if (error || count === null) throw new Error('ORDERS_UNAVAILABLE');
+  return { orders: data || [], count, page };
+}
+
+async function getProductionMetrics(db: any): Promise<ProductionMetrics> {
+  const metrics: ProductionMetrics = { total: 0, pending: 0, paid: 0, cancelled: 0, refunded: 0, verification: 0, revenue: {} };
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await db.from('payment_orders').select('id,status,amount_minor,currency,paid_at,refunded_at,refund_review,verification_only').order('id').range(offset, offset + 999);
+    if (error || !data) throw new Error('ORDERS_UNAVAILABLE');
+    for (const row of data) {
+      if (row.verification_only) { metrics.verification++; continue; }
+      metrics.total++;
+      if (row.status === 'pending') metrics.pending++;
+      if (row.status === 'paid') metrics.paid++;
+      if (row.status === 'cancelled') metrics.cancelled++;
+      if (row.status === 'refunded') metrics.refunded++;
+      if (row.status === 'paid' && row.paid_at && !row.refunded_at && !row.refund_review) metrics.revenue[row.currency] = (metrics.revenue[row.currency] || 0) + row.amount_minor;
+    }
+    if (data.length < 1000) break;
+  }
+  return metrics;
+}
 export type SiteOperation = 'resend' | 'refund' | 'reply' | 'close' | 'reopen' | 'generate_recovery_link';
 export type OperationPayload = { email?: string; message?: string };
 export type OperationResult = { ok: true; message: string } | { error: string };
@@ -25,47 +61,16 @@ export async function getSiteOperations(): Promise<SiteOperationsData> {
 
   const db = getCommerceDb();
   if (db) {
-    let orderRows: any[] = [];
-    if (typeof db.query === 'function') {
-      const res = await db.query(
-        `select id, reference, buyer_email, plan, amount_minor, currency, status, payment_provider, provider_payment_id, fulfillment_error, payment_confirmed_at
-         from public.orders
-         order by id desc`
-      );
-      orderRows = res.rows;
-    } else if (typeof db.from === 'function') {
-      const { data } = await db
-        .from('orders')
-        .select('id, reference, buyer_email, plan, amount_minor, currency, status, payment_provider, provider_payment_id, fulfillment_error, payment_confirmed_at')
-        .order('id', { ascending: false });
-      orderRows = data || [];
+    try {
+      const [metrics, page] = await Promise.all([getProductionMetrics(db), getProductionOrders()]);
+      return { local: false, source: 'production', support: 'unconfigured', orders: [], tickets: [], metrics, productionPage: page } as SiteOperationsData;
+    } catch {
+      return { local: false, source: 'production', support: 'unconfigured', orders: [], tickets: [], error: 'Orders could not be loaded. Check the database connection and try again.' };
     }
-
-    const orders: Order[] = orderRows.map(r => ({
-      id: r.id,
-      reference: r.reference,
-      token: '',
-      plan: r.plan,
-      amount: r.amount_minor,
-      locale: 'zh',
-      email: r.buyer_email,
-      status: r.status,
-      createdAt: r.payment_confirmed_at || new Date().toISOString(),
-      paidAt: r.payment_confirmed_at,
-      expiresAt: null,
-      delivery: r.fulfillment_error ? `ERROR: ${r.fulfillment_error}` : null,
-      resends: 0,
-    }));
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { listSupportTickets } = require('@/lib/support/support-service');
-    const tickets = await listSupportTickets(db);
-    return { local: false, orders, tickets };
   }
-
-  if (!await isLocalAdminPreview()) return { local: false, orders: [], tickets: [] };
+  if (!await isLocalAdminPreview()) return { local: false, source: 'unavailable', support: 'unavailable', orders: [], tickets: [], error: 'Order database is not configured. Contact the site operator.' };
   const store = await import('@/lib/store');
-  return { local: true, orders: store.listOrders(), tickets: store.listTickets() };
+  return { local: true, source: 'local', support: 'local', orders: store.listOrders(), tickets: store.listTickets() };
 }
 
 export function validateOperation(action: unknown, id: unknown, input: unknown): { action: SiteOperation; id: string; payload: OperationPayload } {
@@ -93,127 +98,7 @@ export async function runSiteOperation(action: unknown, id: unknown, input: unkn
   if (!db && !await isLocalAdminPreview()) throw new Error('LOCAL_ONLY');
   const operation = validateOperation(action, id, input);
 
-  if (db) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const {
-      adminReplySupportTicket,
-      adminCloseSupportTicket,
-      adminReopenSupportTicket,
-    } = require('@/lib/support/support-service');
-
-    switch (operation.action) {
-      case 'reply': {
-        await adminReplySupportTicket(db, operation.id, operation.payload.message);
-        return 'Reply saved to support ticket.';
-      }
-      case 'close': {
-        await adminCloseSupportTicket(db, operation.id);
-        return 'Support ticket closed.';
-      }
-      case 'reopen': {
-        await adminReopenSupportTicket(db, operation.id);
-        return 'Support ticket reopened.';
-      }
-      case 'refund': {
-        let order: any = null;
-        if (typeof db.query === 'function') {
-          const rows = (await db.query(`select * from public.orders where id = $1`, [operation.id])).rows;
-          if (rows.length > 0) order = rows[0];
-        } else if (typeof db.from === 'function') {
-          const { data } = await db.from('orders').select('*').eq('id', operation.id).maybeSingle();
-          order = data;
-        }
-        if (!order) throw new Error('NOT_FOUND');
-
-        if (typeof db.query === 'function') {
-          await db.query(`select public.process_refund($1, $2, $3, $4)`, [
-            order.id,
-            order.amount_minor,
-            'Admin initiated refund',
-            'admin_portal',
-          ]);
-        } else if (typeof db.rpc === 'function') {
-          const { error } = await db.rpc('process_refund', {
-            p_order_id: order.id,
-            p_amount_minor: order.amount_minor,
-            p_reason: 'Admin initiated refund',
-            p_initiated_by: 'admin_portal',
-          });
-          if (error) throw error;
-        }
-
-        return `Refund processed and license revoked for order ${order.reference}.`;
-      }
-      case 'resend': {
-        let order: any = null;
-        if (typeof db.query === 'function') {
-          const rows = (await db.query(`select * from public.orders where id = $1`, [operation.id])).rows;
-          if (rows.length > 0) order = rows[0];
-        } else if (typeof db.from === 'function') {
-          const { data } = await db.from('orders').select('*').eq('id', operation.id).maybeSingle();
-          order = data;
-        }
-        if (!order) throw new Error('NOT_FOUND');
-
-        const emailToSend = operation.payload.email || order.buyer_email;
-        if (operation.payload.email && operation.payload.email !== order.buyer_email) {
-          if (typeof db.query === 'function') {
-            await db.query(`update public.orders set buyer_email = $1 where id = $2`, [emailToSend, order.id]);
-          } else if (typeof db.from === 'function') {
-            await db.from('orders').update({ buyer_email: emailToSend }).eq('id', order.id);
-          }
-        }
-
-        const taskId = randomUUID();
-        const idempotencyKey = `resend-${order.id}-${Date.now()}`;
-        const payload = {
-          order_id: order.id,
-          email: emailToSend,
-          plan: order.plan,
-        };
-
-        if (typeof db.query === 'function') {
-          await db.query(
-            `insert into public.order_outbox (id, order_id, event_type, idempotency_key, payload, status, created_at)
-             values ($1, $2, 'order_fulfillment_email', $3, $4, 'pending', now())`,
-            [taskId, order.id, idempotencyKey, JSON.stringify(payload)]
-          );
-        } else if (typeof db.from === 'function') {
-          await db.from('order_outbox').insert({
-            id: taskId,
-            order_id: order.id,
-            event_type: 'order_fulfillment_email',
-            idempotency_key: idempotencyKey,
-            payload,
-            status: 'pending',
-          });
-        }
-
-        return `Fulfillment delivery enqueued for ${order.reference}.`;
-      }
-      case 'generate_recovery_link': {
-        let order: any = null;
-        if (typeof db.query === 'function') {
-          const rows = (await db.query(`select * from public.orders where id = $1`, [operation.id])).rows;
-          if (rows.length > 0) order = rows[0];
-        } else if (typeof db.from === 'function') {
-          const { data } = await db.from('orders').select('*').eq('id', operation.id).maybeSingle();
-          order = data;
-        }
-        if (!order) throw new Error('NOT_FOUND');
-
-        const { token, tokenHash } = generateOrderAccessToken();
-        if (typeof db.query === 'function') {
-          await db.query(`update public.orders set order_access_token_hash = $1 where id = $2`, [tokenHash, order.id]);
-        } else if (typeof db.from === 'function') {
-          await db.from('orders').update({ order_access_token_hash: tokenHash }).eq('id', order.id);
-        }
-
-        const baseUrl = process.env.APP_URL || 'http://127.0.0.1:3000';
-        return `${baseUrl}/order/${token}`;
-      }
-    }
-  }
+  if (db) throw new Error('LOCAL_ONLY');
 
   if (!await isLocalAdminPreview()) throw new Error('LOCAL_ONLY');
   const store = await import('@/lib/store');

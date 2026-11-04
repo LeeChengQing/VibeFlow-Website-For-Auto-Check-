@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { runSiteOperation, type OperationResult } from '@/lib/site-operations';
+import { runSiteOperation, getProductionOrders, type OperationResult } from '@/lib/site-operations';
 import { recordSiteActivity } from '@/lib/site-settings';
 
 export async function operationAction(action: unknown, id: unknown, payload: unknown = {}): Promise<OperationResult> {
@@ -28,4 +28,9 @@ export async function operationAction(action: unknown, id: unknown, payload: unk
     };
     return { error: Object.hasOwn(messages, code) ? messages[code] : 'Could not update the record. Refresh and try again.' };
   }
+}
+
+export async function productionOrdersAction(input: { search?: string; status?: string; page?: number }) {
+  try { return { data: await getProductionOrders(input) }; }
+  catch (error) { return { error: error instanceof Error && error.message === 'UNAUTHORIZED' ? 'Your session expired. Sign in again.' : 'Orders could not be loaded. Check the database connection and try again.' }; }
 }

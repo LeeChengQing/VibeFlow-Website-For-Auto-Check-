@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { operationAction } from './operations-actions';
+import { operationAction, productionOrdersAction } from './operations-actions';
 import { getOrderPlanDisplay, price } from '@/lib/plans';
-import type { SiteOperation, SiteOperationsData } from '@/lib/site-operations';
+import type { SiteOperation, SiteOperationsData, ProductionOrderPage } from '@/lib/site-operations';
 
 const field = 'w-full rounded-xl border border-white/15 bg-black/25 px-3 py-2 text-sm text-white outline-none focus:border-emerald-300/60';
 const button = 'rounded-xl border border-white/15 px-3 py-2 text-sm text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40';
@@ -14,6 +14,12 @@ function timestamp(value: string | null) {
 }
 
 export function OperationsOverview({ data }: { data: SiteOperationsData }) {
+  if (data.source === 'production') {
+    if (data.error || !data.metrics) return <p role="alert">{data.error || 'Order metrics are unavailable.'}</p>;
+    const m = data.metrics;
+    const values = [['Total Orders', m.total], ['Pending Orders', m.pending], ['Paid Orders', m.paid], ['Cancelled Orders', m.cancelled], ['Refunded Orders', m.refunded], ['Verification-only orders', m.verification], ['Confirmed Paid Revenue', Object.entries(m.revenue).map(([currency, amount]) => `${currency} ${(amount / 100).toFixed(2)}`).join(' · ') || '0']];
+    return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{values.map(([label, value]) => <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs text-white/55">{label}</p><p className="mt-2 text-2xl font-semibold text-white">{value}</p></div>)}</div>;
+  }
   const paid = data.orders.filter(order => order.status === 'paid');
   const stats = [
     ['Local orders', String(data.orders.length)],
@@ -21,7 +27,7 @@ export function OperationsOverview({ data }: { data: SiteOperationsData }) {
     ['Open support tickets', String(data.tickets.filter(ticket => ticket.status === 'open').length)],
     ['Simulated refunds', String(data.orders.filter(order => order.status === 'refunded').length)],
   ];
-  if (!data.local) return <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Order and support metrics are unavailable here. Existing commerce tools run only in the local preview.</p>;
+  if (data.source !== 'local') return <p role="alert" className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">Order and support metrics are unavailable here. Existing commerce tools run only in the local preview.</p>;
   return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{stats.map(([label, value]) => <div key={label} className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs text-white/55">{label}</p><p className="mt-2 break-words text-2xl font-semibold text-white">{value}</p></div>)}</div>;
 }
 
@@ -54,7 +60,8 @@ export function OperationsPanel({ data }: { data: SiteOperationsData }) {
   function changeTab(value: 'orders' | 'tickets') { setTab(value); setStatus(''); setSelected(''); setFeedback({}); setReply(''); }
   function select(id: string, deliveryEmail = '') { if (pending) return; setSelected(id); setEmail(deliveryEmail); setFeedback({}); setReply(''); }
 
-  if (!data.local) return <section className="rounded-2xl border border-white/10 bg-white/5 p-6"><h2 className="text-xl font-semibold text-white">Orders & support</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Local commerce operations are unavailable on this host. Live payments and email delivery have not been connected. Use the authenticated localhost preview to manage test orders and support tickets.</p></section>;
+  if (data.source === 'production') return <ProductionOperations data={data} />;
+  if (data.source !== 'local') return <section className="rounded-2xl border border-white/10 bg-white/5 p-6"><h2 className="text-xl font-semibold text-white">Orders & support</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Local commerce operations are unavailable on this host. Live payments and email delivery have not been connected. Use the authenticated localhost preview to manage test orders and support tickets.</p></section>;
 
   return <section className="space-y-5" aria-label="Local orders and support">
     <div><h2 className="text-xl font-semibold text-white">Orders & support</h2><p className="mt-1 text-sm text-white/55">Local test data · no live payments or email sending · all times MYT</p></div>
@@ -74,5 +81,31 @@ export function OperationsPanel({ data }: { data: SiteOperationsData }) {
       </div>
     </div>
     {pending && <p role="status" className="text-sm text-white/50">Saving the local record…</p>}
+  </section>;
+}
+
+function ProductionOperations({ data }: { data: SiteOperationsData }) {
+  const [page, setPage] = useState<ProductionOrderPage | undefined>(data.productionPage);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [selected, setSelected] = useState('');
+  const [error, setError] = useState(data.error || '');
+  const [pending, startTransition] = useTransition();
+  const order = page?.orders.find(item => item.id === selected);
+  function load(nextPage: number, nextSearch = search, nextStatus = status) {
+    startTransition(async () => {
+      const result = await productionOrdersAction({ page: nextPage, search: nextSearch, status: nextStatus });
+      if (result.error) { setError(result.error); setPage(undefined); }
+      else { setPage(result.data); setError(''); setSelected(''); }
+    });
+  }
+  return <section className="space-y-5" aria-label="Production orders and support">
+    <div><h2 className="text-xl font-semibold">Orders & support</h2><p className="text-sm text-white/55">Production orders · read only · all times MYT</p></div>
+    <OperationsOverview data={data} />
+    <p className="rounded-xl border border-white/10 p-3">Support backend not configured</p>
+    <form className="flex flex-wrap gap-3" onSubmit={event => { event.preventDefault(); load(1); }}><label>Search by order ID, email or package<input className={field} value={search} onChange={event => setSearch(event.target.value)} /></label><label>Status<select className={field} value={status} onChange={event => { setStatus(event.target.value); load(1, search, event.target.value); }}><option value="">All statuses</option>{['pending', 'paid', 'cancelled', 'refunded'].map(value => <option key={value}>{value}</option>)}</select></label><button className={button} disabled={pending}>Search</button></form>
+    {error && <p role="alert">{error}</p>}
+    {page && <><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th>Order ID / email</th><th>Package</th><th>Status</th><th>Amount</th></tr></thead><tbody>{page.orders.map(item => <tr key={item.id}><td className="p-3"><button className="text-emerald-200 underline" onClick={() => setSelected(item.id)}>{item.id}</button><p>{item.buyer_email || '—'}</p></td><td>{item.plan}</td><td>{item.status}{item.verification_only ? ' · verification only' : ''}</td><td>{item.currency} {(item.amount_minor / 100).toFixed(2)}</td></tr>)}</tbody></table>{page.orders.length === 0 && <p>No orders match this search.</p>}</div><div className="flex gap-3"><button className={button} disabled={pending || page.page <= 1} onClick={() => load(page.page - 1)}>Previous</button><span>Page {page.page} · {page.count} orders</span><button className={button} disabled={pending || page.page * 20 >= page.count} onClick={() => load(page.page + 1)}>Next</button></div></>}
+    {order && <div className="rounded-2xl border border-white/10 p-5"><h3>Order details</h3><dl className="grid grid-cols-[auto_1fr] gap-2 text-sm">{Object.entries({ 'Order ID': order.id, 'Customer email': order.buyer_email || '—', Package: order.plan, 'Payment status': order.status, Amount: `${order.currency} ${(order.amount_minor / 100).toFixed(2)}`, Provider: order.payment_provider, Created: timestamp(order.created_at), Paid: timestamp(order.paid_at), 'Refund status': order.refunded_at ? `Refunded ${timestamp(order.refunded_at)}` : order.refund_review ? 'Under review' : order.status === 'refunded' ? 'Refunded' : 'Not recorded', 'Verification only': order.verification_only ? 'Yes' : 'No' }).map(([label, value]) => <div key={label} className="contents"><dt className="text-white/50">{label}</dt><dd className="break-all">{value}</dd></div>)}</dl></div>}
   </section>;
 }
