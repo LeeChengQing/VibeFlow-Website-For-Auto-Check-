@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 export function MobileFloatingControls() {
   const pathname = usePathname();
   useEffect(() => {
+    if (pathname === '/checkout') return;
     const root = document.documentElement;
     const media = window.matchMedia('(max-width: 767px)');
     let frame = 0;
