@@ -19,6 +19,8 @@ export function PageTransitionWrapper({ children }: { children: ReactNode }) {
   const reducedMotion = useReducedMotion();
   const element = useRef<HTMLDivElement>(null);
 
+  if (pathname === '/checkout') return <>{children}</>;
+
   return (
     <m.div
       // Root templates only remount for their own segment. This also covers

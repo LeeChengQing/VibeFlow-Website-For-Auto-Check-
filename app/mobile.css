@@ -104,10 +104,6 @@
   .final-cta .mobile-final-purchase { margin-top: 24px; }
   .guide-dialog { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); max-width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px); overflow: auto; }
   .guide-dialog-head .button { min-height: 44px; }
-  .checkout-modal { height: var(--mobile-visual-height, 100dvh); bottom: auto; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); overscroll-behavior: contain; }
-  .checkout-modal-panel { max-height: calc(var(--mobile-visual-height, 100dvh) - max(16px, env(safe-area-inset-top, 0px)) - max(16px, env(safe-area-inset-bottom, 0px))); overflow: hidden; overscroll-behavior: contain; }
-  .checkout-modal .form label { font-size: 16px; }
-  .checkout-modal .button { min-height: 52px; font-size: 16px; }
 }
 
 @media (max-width: 374px) {

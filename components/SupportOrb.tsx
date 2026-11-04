@@ -8,7 +8,8 @@ import {isLowEffects,subscribeEffectsPolicy} from '@/lib/performancePolicy';
 import {isScrollActive,subscribeScrollActivity} from '@/lib/scrollActivity';
 import {isAmbientBusy,subscribeAmbientActivity} from '@/lib/ambientActivity';
 export function SupportOrb(){
-  const isAdmin=usePathname()==='/admin';
+  const p=usePathname();
+  const isAdmin=p==='/admin'||p==='/checkout';
   const {t}=useLocale();const videoRef=useRef<HTMLVideoElement>(null);
   useEffect(()=>{
     const video=videoRef.current;if(!video)return;

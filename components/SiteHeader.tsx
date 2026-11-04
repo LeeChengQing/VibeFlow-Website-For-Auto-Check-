@@ -1,5 +1,6 @@
 'use client';
 import Image from 'next/image';
+import { BuyButton } from './BuyButton';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
@@ -41,11 +42,13 @@ export function SiteHeader() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  if (pathname === '/checkout') return null;
+
   return <header ref={headerRef} className="site-header" data-menu-open={menu ? '' : undefined}><div className="nav-wrap">
     <Link prefetch={true} href="/" onClick={handleLogoClick} className="brand" aria-label="Auto-Check home"><Image src="/files/logo.png" alt="" width="34" height="34" sizes="34px" quality={100} loading="eager"/><span className="brand-copy"><span className="brand-name">Auto-Check</span><span className="brand-credit">by <span className="vibeflow-wordmark">Vibe<strong>Flow</strong></span></span></span></Link>
     <nav id="site-navigation" className={menu?'nav-links is-open':'nav-links'} aria-label={t('主导航','Main navigation')}>
       <Link prefetch={true} href="/#product" onClick={()=>setMenu(false)}>{t('产品介绍','Product')}</Link><Link prefetch={true} href="/#tutorials" onClick={()=>setMenu(false)}>{t('使用教程','Guides')}</Link>{config.settings.supportUrl&&<Link prefetch={true} href={config.settings.supportUrl} onClick={()=>setMenu(false)}>{t('联系客服','Support')}</Link>}
     </nav>
-    <div className="nav-actions"><button className="language-button" onClick={()=>setLocale(locale==='zh'?'en':'zh')} aria-label={locale==='zh'?'Switch to English':'切换中文'}>{locale==='zh'?'EN':'中文'}</button><Link prefetch={true} className="button small primary" href="/#pricing">{t('立即购买','Get started')} <span aria-hidden>↗</span></Link><button ref={menuRef} className="menu-button" aria-label={menu?t('关闭导航','Close navigation'):t('打开导航','Toggle navigation')} aria-controls="site-navigation" aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?'×':'☰'}</button></div>
+    <div className="nav-actions"><button className="language-button" onClick={()=>setLocale(locale==='zh'?'en':'zh')} aria-label={locale==='zh'?'Switch to English':'切换中文'}>{locale==='zh'?'EN':'中文'}</button><BuyButton plan="bundle" className="button small primary">{t('立即购买','Get started')}</BuyButton><button ref={menuRef} className="menu-button" aria-label={menu?t('关闭导航','Close navigation'):t('打开导航','Toggle navigation')} aria-controls="site-navigation" aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?'×':'☰'}</button></div>
   </div></header>;
 }
