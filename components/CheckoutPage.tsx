@@ -40,8 +40,13 @@ export function CheckoutPage({ plan }: { plan: PlanCode }) {
     if (providers.length && !providers.includes(paymentMethod)) setPaymentMethod(providers[0] as PaymentMethod);
   }, [providers, paymentMethod]);
   useEffect(() => {
+    // Checkout shares #main with the storefront. A previous route's fade
+    // must never leave the new page or the back-navigation view transparent.
+    gsap.killTweensOf('#main');
     gsap.set('#main', { clearProps: 'opacity' });
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // On mobile, entrance transforms create containing blocks for the
+    // fixed payment CTA, making it jump/flicker as the layout settles.
+    if (window.matchMedia('(max-width: 900px), (prefers-reduced-motion: reduce)').matches) return;
     const context = gsap.context(() => {
       gsap.from('[data-checkout-topbar]', { opacity: 0, duration: 0.25, clearProps: 'all' });
       gsap.from('[data-checkout-enter]', { opacity: 0, y: 12, stagger: 0.04, duration: 0.35, ease: 'power2.out', clearProps: 'all' });
