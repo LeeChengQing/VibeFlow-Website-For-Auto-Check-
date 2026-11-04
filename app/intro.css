@@ -7,7 +7,9 @@ html[data-intro="playing"]{overflow:hidden}
 .si-grid-lines{position:absolute;inset:-5%;mix-blend-mode:screen;background:linear-gradient(#00e5ff33 1px,transparent 1px) 0 0/56px 56px,linear-gradient(90deg,#00e5ff33 1px,transparent 1px) 0 0/56px 56px,radial-gradient(circle at 0 0,#00f0d0 0,#00f0d0 1.6px,transparent 2.4px) 0 0/56px 56px}
 .si-paper{position:absolute;inset:0;background:#fff;mask-image:radial-gradient(circle at 50% 50%,transparent var(--r),#000 calc(var(--r) + var(--f)));-webkit-mask-image:radial-gradient(circle at 50% 50%,transparent var(--r),#000 calc(var(--r) + var(--f)))}
 .si-content{position:absolute;inset:0;display:grid;place-items:center}
-.si-logo{position:absolute;width:clamp(180px,30vmin,320px);opacity:0}
-.si-text{position:relative;display:flex;font-weight:800;font-size:clamp(40px,9vmin,92px);letter-spacing:-.03em;color:#0B1F2A}
+.si-logo{position:absolute;width:clamp(220px,40vmin,420px);opacity:0;z-index:0}
+.si-text{position:relative;z-index:1;display:flex;font-weight:800;font-size:clamp(40px,9vmin,92px);letter-spacing:-.03em;color:#06141C;text-shadow:0 0 14px #fff,0 0 28px #fff,0 0 3px #fff}
 .si-letter{display:inline-block;opacity:0;white-space:pre}
 .si-skip{position:absolute;left:0;right:0;bottom:max(28px,env(safe-area-inset-bottom));text-align:center;font-size:12px;color:#0B1F2A66;opacity:0}
+
+.si-ring,.si-tick{stroke-dasharray:1;stroke-dashoffset:1}
