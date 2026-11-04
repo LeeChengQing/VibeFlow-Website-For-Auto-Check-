@@ -33,7 +33,7 @@ function ExtensionPricingCard() {
 
 export function Landing({children}:{children:ReactNode}){
   const {t,locale,setLocale}=useLocale();const [guide,setGuide]=useState<{src:string;title:string;alt:string}|null>(null);
-  const {config,preview}=useSiteConfig();
+  const {config,preview,pricingReady,pricingFailed}=useSiteConfig();
   const purchaseNotice=config.content.purchaseNotice[locale];
   const rootRef=useRef<HTMLDivElement>(null);useLandingMotion(rootRef,locale);
   const features=config.content.features.map(item=>[item.title[locale],item.description[locale]]);
@@ -47,7 +47,7 @@ export function Landing({children}:{children:ReactNode}){
     {preview&&<div className="shell panel" role="status">{t('草稿预览 · 结账已禁用','Draft preview · Checkout disabled')} <button type="button" className="button small secondary" onClick={()=>setLocale(locale==='zh'?'en':'zh')}>{locale==='zh'?'Preview in English':'预览中文'}</button></div>}
     {config.settings.maintenance&&<div className="shell panel" role="status">{config.settings.maintenanceMessage[locale]}</div>}
     {config.content.announcementEnabled&&<div className="shell panel" role="status">{config.content.announcement[locale]}</div>}
-    {!config.settings.checkoutEnabled&&!config.settings.maintenance&&!preview&&<div className="shell panel" role="status">{t('结账暂不可用，请稍后再来。','Checkout is currently unavailable. Please check back soon.')}</div>}
+    {!config.settings.maintenance&&!preview&&(!pricingReady||!config.settings.checkoutEnabled)&&<div className="shell panel" role="status">{!pricingReady?(pricingFailed?t('价格加载失败，正在自动重试；暂不可结账。','Prices could not be loaded. Retrying automatically; checkout is temporarily unavailable.'):t('正在获取最新价格；暂不可结账。','Checking current prices; checkout is temporarily unavailable.')):t('结账暂不可用，请稍后再来。','Checkout is currently unavailable. Please check back soon.')}</div>}
     {children}
     <Showcase/>
     <section id="workflow" className="shell section" aria-labelledby="workflow-title"><div className="section-heading"><div><p className="eyebrow">HOW IT WORKS / 01</p><h2 id="workflow-title">{t('开始，其实很简单。','Simple from the start.')}</h2></div><p>{t('选对方案，完成设置，回到你的课程。','Pick your package, get set up, and get back to your classes.')}</p></div><div className="steps">{[
