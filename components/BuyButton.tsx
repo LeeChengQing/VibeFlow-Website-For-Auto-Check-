@@ -21,7 +21,10 @@ export function BuyButton({ plan, children, className = 'button primary', trigge
     navigating.current = true;
     const push = () => { router.push('/checkout?plan=' + plan); navigating.current = false; };
     const main = document.getElementById('main');
-    if (main && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Keep the current screen visible while the mobile checkout route loads.
+    // Fading #main to zero exposes a blank black frame on small viewports.
+    const mobileLayout = window.matchMedia('(max-width: 900px)').matches;
+    if (main && !mobileLayout && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       gsap.to(main, { opacity: 0, duration: 0.2, onComplete: push });
     } else push();
   }
