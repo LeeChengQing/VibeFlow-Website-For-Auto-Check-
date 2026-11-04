@@ -9,7 +9,8 @@ export function publicSalesEnabled(env:Record<string,string|undefined>=process.e
 
 export function configuredPaymentProviders(env:Record<string,string|undefined>=process.env):('stripe'|'toyyibpay')[] {
   const providers:('stripe'|'toyyibpay')[]=[];
-  if(checkPaymentProviderEnabled('stripe',env).enabled&&env.STRIPE_LIVE_MODE==='true'&&env.STRIPE_SECRET_KEY?.trim().startsWith('sk_live_')&&env.STRIPE_WEBHOOK_SECRET?.trim())providers.push('stripe');
+  if(checkPaymentProviderEnabled('stripe',env).enabled&&env.STRIPE_LIVE_MODE?.trim()==='true'&&env.STRIPE_SECRET_KEY?.trim().startsWith('sk_live_')&&env.STRIPE_WEBHOOK_SECRET?.trim())providers.push('stripe');
+  else console.info('[payment-config]',{provider:'stripe',keyMode:env.STRIPE_SECRET_KEY?.trim().startsWith('sk_live_')?'live':env.STRIPE_SECRET_KEY?.trim().startsWith('sk_test_')?'test':'missing_or_invalid',liveMode:env.STRIPE_LIVE_MODE?.trim()==='true',webhookConfigured:!!env.STRIPE_WEBHOOK_SECRET?.trim()});
   if(checkPaymentProviderEnabled('toyyibpay',env).enabled&&env.TOYYIBPAY_SANDBOX==='false'&&env.TOYYIBPAY_SECRET_KEY?.trim()&&env.TOYYIBPAY_CATEGORY_CODE?.trim())providers.push('toyyibpay');
   return providers;
 }
