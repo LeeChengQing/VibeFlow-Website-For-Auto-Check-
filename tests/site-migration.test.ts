@@ -15,7 +15,8 @@ test('site migration denies browser roles and atomically publishes/restores/audi
     await db.exec(readFileSync('supabase/migrations/20261003182731_site_management.sql', 'utf8'));
     const { rows } = await db.query<{ published: typeof DEFAULT_SITE_CONFIG }>('select published from public.site_configuration');
     // Historical marketing copy can differ from today's UI; operational defaults must still match.
-    assert.deepEqual(rows[0].published.packages, DEFAULT_SITE_CONFIG.packages);
+    const operational = (p: typeof DEFAULT_SITE_CONFIG.packages[number]) => ({ id:p.id, amount:p.amount, promotionalAmount:p.promotionalAmount, promotionEnabled:p.promotionEnabled, enabled:p.enabled, visible:p.visible });
+    assert.deepEqual(rows[0].published.packages.map(operational), DEFAULT_SITE_CONFIG.packages.map(operational));
     assert.deepEqual(rows[0].published.settings, DEFAULT_SITE_CONFIG.settings);
     for (const role of ['anon', 'authenticated']) {
       await db.exec(`set role ${role}`);

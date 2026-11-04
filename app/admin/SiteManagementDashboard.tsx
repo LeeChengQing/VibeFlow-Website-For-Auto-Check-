@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { DEFAULT_SITE_CONFIG, offerIsActive, packagePrice, validateSiteConfig, type SiteActionResult, type SiteConfig, type SiteManagementData } from '@/lib/site-config';
+import { canonicalCampaignStatus } from '@/lib/canonical-pricing';
+import { DEFAULT_SITE_CONFIG, packagePrice, validateSiteConfig, type SiteActionResult, type SiteConfig, type SiteManagementData } from '@/lib/site-config';
 import { completeSiteUploadAction, prepareSiteUploadAction, publishSiteAction, restoreSiteAction, saveSiteDraftAction, uploadSiteAssetAction } from './site-actions';
 import { logoutAction } from './actions';
 import { EditorPanel, SiteConfigEditor, TextField, type EditorSection } from './SiteConfigEditor';
@@ -31,6 +32,16 @@ export function SiteManagementDashboard({ management: suppliedManagement, childr
   const management = suppliedManagement ?? retainedManagement ?? unavailableManagement;
   const settingsAvailable = suppliedManagement !== null;
   const [section, setSelectedSection] = useState<Section>('Overview');
+  const [offerStatus, setOfferStatus] = useState('Unavailable');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/admin/pricing', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      if (!response.ok) throw new Error('Unavailable');
+      const { campaign, server_now } = await response.json();
+      setOfferStatus(canonicalCampaignStatus(campaign, server_now));
+    }).catch(() => { if (!controller.signal.aborted) setOfferStatus('Unavailable'); });
+    return () => controller.abort();
+  }, [suppliedManagement?.version]);
   const [config, setConfig] = useState(management.draft);
   const [baseline, setBaseline] = useState(stringify(management.draft));
   const [version, setVersion] = useState(management.version);
@@ -171,7 +182,7 @@ export function SiteManagementDashboard({ management: suppliedManagement, childr
           {message && <p role="status" className="mb-6 rounded-xl border border-cyan-300/15 bg-cyan-300/5 p-4 text-sm leading-6 text-cyan-100">{message}</p>}
           {uploading && <p role="status" className="mb-5 text-sm text-cyan-200">Uploading file…</p>}
           {section === 'Overview' && <div className="grid gap-6">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Packages visible', `${config.packages.filter(p => p.visible).length} / ${config.packages.length}`, 'Draft storefront'], ['Guides visible', String(config.guides.filter(g => g.visible).length), 'Draft setup guides'], ['Offer status', offerIsActive(config) ? 'Active' : config.offer.enabled && Date.parse(config.offer.startsAt) > Date.now() ? 'Scheduled' : 'Inactive', 'Draft · Malaysia time'], ['Checkout', config.settings.maintenance ? 'Maintenance' : config.settings.checkoutEnabled ? 'Enabled' : 'Disabled', 'Draft availability']].map(([label, value, caption]) => <section key={label} className={`${glassPanel} p-5`}><h2 className="text-xs text-white/55">{label}</h2><p className="mt-4! text-2xl font-semibold tabular-nums tracking-tight">{value}</p><p className="mt-3! text-[10px] text-white/35">{caption}</p></section>)}</div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Packages visible', `${config.packages.filter(p => p.visible).length} / ${config.packages.length}`, 'Draft storefront'], ['Guides visible', String(config.guides.filter(g => g.visible).length), 'Draft setup guides'], ['Offer status', offerStatus, 'Canonical · Malaysia time'], ['Checkout', config.settings.maintenance ? 'Maintenance' : config.settings.checkoutEnabled ? 'Enabled' : 'Disabled', 'Draft availability']].map(([label, value, caption]) => <section key={label} className={`${glassPanel} p-5`}><h2 className="text-xs text-white/55">{label}</h2><p className="mt-4! text-2xl font-semibold tabular-nums tracking-tight">{value}</p><p className="mt-3! text-[10px] text-white/35">{caption}</p></section>)}</div>
             {overview}
             <EditorPanel title="Draft package prices" description="Amounts use the draft offer schedule. Customers use the published configuration."><div className="divide-y divide-white/10">{config.packages.slice().sort((a, b) => a.order - b.order).map(p => <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><p className="text-sm font-medium">{p.name.en}</p><p className="mt-1! text-xs text-white/45">{!p.visible ? 'Hidden' : !p.enabled ? 'Purchasing disabled' : 'Visible · purchasing enabled'}</p></div><p className="font-mono text-lg tabular-nums text-cyan-100">{rm(packagePrice(config, p.id))}</p></div>)}</div></EditorPanel>
             <EditorPanel title="Publication workflow" description="Edit → Save draft → Preview draft → Publish changes"><p className="text-sm leading-6 text-white/55">A saved draft is private. Publishing applies its prices, content, guides and settings to the storefront together. History restores a previous publication into draft for review.</p><div className="flex flex-wrap gap-3"><button type="button" className={secondaryButton} onClick={() => request(() => setSection('Pricing & Offers'))}>Edit pricing</button><button type="button" className={secondaryButton} onClick={() => request(() => setSection('History'))}>Review history</button></div></EditorPanel>

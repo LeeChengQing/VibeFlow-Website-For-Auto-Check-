@@ -1,6 +1,13 @@
 import type { SiteConfig } from './site-config';
 export type PriceRow={id:string;product_key:string;currency:string;regular_amount_minor:number;promotional_amount_minor:number|null;effective_amount_minor:number|null;enabled:boolean;promotion_enabled:boolean;promotion_active:boolean;version:number;campaign_starts_at:string|null;campaign_ends_at:string|null};
 export type PricingCatalog={server_now:string;campaign:{id:string;name:string;enabled:boolean;starts_at:string|null;ends_at:string|null;version:number;state:string};products:PriceRow[];providers?:string[];checkout_allowed?:boolean};
+export function canonicalCampaignStatus(campaign:PricingCatalog['campaign'],serverNow:string):string {
+  if(typeof campaign?.enabled!=='boolean')return 'Unavailable';
+  if(!campaign.enabled)return 'Disabled';
+  const start=Date.parse(campaign.starts_at??''),end=Date.parse(campaign.ends_at??''),now=Date.parse(serverNow);
+  if(!Number.isFinite(start)||!Number.isFinite(end)||!Number.isFinite(now)||start>=end)return 'Unavailable';
+  return now<start?'Scheduled':now<end?'Active':'Expired';
+}
 const productKeys:Record<string,string>={extension:'extension',mobile_notification:'phone',mobile_notification_yearly:'yearly',bundle:'bundle'};
 export function applyCanonicalPricing(config:SiteConfig,data:PricingCatalog):SiteConfig {
   if(!Number.isFinite(Date.parse(data?.server_now))||!data.campaign||!Array.isArray(data.products)||!data.products.length) throw Error('pricing_unavailable');
