@@ -26,9 +26,8 @@ export function SiteIntro(){
       finished=true;removeListeners();
       try{sessionStorage.setItem('vf-intro','1');}catch{}
       html.dataset.intro='done';
-      gsap.set(document.getElementById('main'),{clearProps:'all'});
       window.dispatchEvent(new Event('intro:done'));
-      setDone(true);tl?.kill();
+      setDone(true);context.revert();tl=undefined;
     };
     function skip(event:Event){
       event.preventDefault();event.stopPropagation();
@@ -57,21 +56,22 @@ export function SiteIntro(){
           tl=gsap.timeline({onComplete:finish})
             .fromTo('.si-logo',{opacity:0},{opacity:1,duration:.2},.3)
             .fromTo('.si-logo',{scale:.92},{scale:1,duration:.9,ease:'expo.out'},.3)
-            .fromTo('.si-ring',{strokeDashoffset:1},{strokeDashoffset:0,duration:.55,ease:'power2.out'},.3)
-            .fromTo('.si-tick',{strokeDashoffset:1},{strokeDashoffset:0,duration:.35,ease:'power2.out'},.8)
+            .addLabel('circleStart',.3)
+            .fromTo('.si-ring',{strokeDashoffset:1},{strokeDashoffset:0,autoRound:false,duration:.7,ease:'power2.out'},'circleStart')
+            .addLabel('circleComplete','>')
+            .fromTo('.si-tick',{strokeDashoffset:1},{strokeDashoffset:0,autoRound:false,duration:.35,ease:'power2.out'},'circleComplete+=0.05')
             .to('.si-skip',{opacity:1,duration:.4},.8)
-            .fromTo('.si-letter',{opacity:0,y:24,filter:'blur(8px)'},{opacity:1,y:0,filter:'blur(0px)',duration:.5,stagger:.045,ease:'power3.out'},1)
+            .fromTo('.si-letter',{opacity:0,y:24},{opacity:1,y:0,duration:.5,stagger:.045,ease:'power3.out'},1)
             .call(()=>{window.dispatchEvent(new Event('intro:prewarm'));},[],1.9)
             .to('.si-logo',{scale:1.03,duration:.5,ease:'sine.inOut'},1.9)
-            .to('.si-content',{scale:1.15,opacity:0,filter:'blur(6px)',duration:.4,ease:'power2.in'},2.3)
+            .to('.si-content',{scale:1.15,opacity:0,duration:.4,ease:'power2.in'},2.3)
             .to('.si-skip',{opacity:0,duration:.2},2.3)
             .call(()=>{window.dispatchEvent(new Event('intro:reveal'));},[],2.4)
             .to(state,{r:Math.hypot(w/2,h/2)+F+10,duration:1.2,ease:'power2.inOut',onUpdate:()=>{el.style.setProperty('--r',state.r+'px');}},2.4)
             .fromTo('.si-grid',{opacity:0},{opacity:1,duration:.2},2.4)
             .to('.si-grid',{opacity:0,duration:.5},3.1)
             .fromTo('.si-grid-lines',{scale:1},{scale:1.08,duration:1.2},2.4)
-            .fromTo('.si-veil',{opacity:.45},{opacity:0,duration:1.2,ease:'power2.out'},2.4)
-            .fromTo(document.getElementById('main'),{scale:1.05,transformOrigin:'50% 35%'},{scale:1,duration:1.2,ease:'expo.out'},2.4);
+            .fromTo('.si-veil',{opacity:.45},{opacity:0,duration:1.2,ease:'power2.out'},2.4);
           if(skipped)tl.timeScale(4);
         });
       });

@@ -20,6 +20,7 @@ export function PageTransitionWrapper({ children }: { children: ReactNode }) {
   const element = useRef<HTMLDivElement>(null);
 
   if (pathname === '/checkout') return <>{children}</>;
+  if (pathname === '/') return <div className={styles.page} data-page-transition="">{children}</div>;
 
   return (
     <m.div

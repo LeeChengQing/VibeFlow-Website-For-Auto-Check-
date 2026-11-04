@@ -11,9 +11,10 @@ export function PerformanceRuntime(){
   const pathname=usePathname();
   useEffect(()=>settleAmbientNavigation(),[pathname]);
   useEffect(()=>{
-    const reduced=matchMedia('(prefers-reduced-motion:reduce)'),coarse=matchMedia('(any-pointer:coarse)');
+    const reduced=matchMedia('(prefers-reduced-motion:reduce)');
     let runtimeLow=false,previous=0,windowStart=0,total=0,count=0,slowWindows=0;
     let ignoreUntil=0;
+    let frameBudget=1000/60;
     const introDone=()=>{ignoreUntil=performance.now()+1000;};
     window.addEventListener('intro:done',introDone);
     let releaseMonitor:(()=>void)|undefined,pausedTimeline=false;
@@ -33,10 +34,10 @@ export function PerformanceRuntime(){
     const syncPolicy=()=>{const reason=deviceEffectsReason();setEffectsPolicy(!!reason||runtimeLow,reason||(runtimeLow?'runtime':''));};
     const sample=(now:number)=>{
       if(document.documentElement.dataset.intro==='playing'||performance.now()<ignoreUntil){previous=0;windowStart=0;total=0;count=0;slowWindows=0;return;}
-      if(previous){total+=now-previous;count++;}previous=now;
+      if(previous){const delta=now-previous;total+=delta;count++;if(delta>=4)frameBudget=Math.min(frameBudget,delta);}previous=now;
       if(!windowStart)windowStart=now;
       if(now-windowStart<1000||!count)return;
-      slowWindows=total/count>20?slowWindows+1:0;windowStart=now;total=0;count=0;
+      slowWindows=total/count>frameBudget*1.5?slowWindows+1:0;windowStart=now;total=0;count=0;
       if(slowWindows>=2){runtimeLow=true;syncPolicy();releaseMonitor?.();releaseMonitor=undefined;}
     };
     const visibility=()=>{
@@ -52,8 +53,8 @@ export function PerformanceRuntime(){
     };
     syncPolicy();releaseMonitor=subscribeAnimationFrame(sample);
     document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);
-    reduced.addEventListener('change',syncPolicy);coarse.addEventListener('change',syncPolicy);document.addEventListener('visibilitychange',visibility);
-    return()=>{window.removeEventListener('intro:done',introDone);releaseMonitor?.();document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);reduced.removeEventListener('change',syncPolicy);coarse.removeEventListener('change',syncPolicy);document.removeEventListener('visibilitychange',visibility);if(pausedTimeline)gsap.globalTimeline.resume();pausedAnimations.clear();};
+    reduced.addEventListener('change',syncPolicy);document.addEventListener('visibilitychange',visibility);
+    return()=>{window.removeEventListener('intro:done',introDone);releaseMonitor?.();document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);reduced.removeEventListener('change',syncPolicy);document.removeEventListener('visibilitychange',visibility);if(pausedTimeline)gsap.globalTimeline.resume();for(const animation of pausedAnimations){const target=(animation.effect as KeyframeEffect|null)?.target;if(target?.isConnected&&animation.playState==='paused')animation.play();}pausedAnimations.clear();};
   },[]);
   return null;
 }

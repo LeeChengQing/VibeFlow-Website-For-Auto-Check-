@@ -71,12 +71,10 @@ export function MobilePurchase({ initialProduct = 'bundle' }: { initialProduct?:
   function requestPurchase(origin?: HTMLElement) {
     // Safari pointer activation may leave the body focused; preserve this entry point.
     origin?.focus({ preventScroll: true });
-    if (product === 'notification' && !viewPlans) setViewPlans(true);
-    else buyRef.current?.click();
-    // Open the existing form immediately; scroll only to bring that form into reach.
-    requestAnimationFrame(() => {
-      if (!document.querySelector('.checkout-modal')) inlineRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
-    });
+    if (product === 'notification' && !viewPlans) {
+      setViewPlans(true);
+      requestAnimationFrame(() => inlineRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    } else buyRef.current?.click();
   }
   useEffect(() => { action.current = requestPurchase; return () => { action.current = null; }; });
 

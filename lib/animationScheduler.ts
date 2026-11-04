@@ -12,7 +12,7 @@ const sync=()=>{
   else if(!shouldRun&&listening){listening=false;gsap.ticker.remove(tick);}
 };
 export function subscribeAnimationFrame(task:FrameTask){
-  if(!initialized){initialized=true;gsap.ticker.lagSmoothing(0);gsap.ticker.fps(120);}
+  if(!initialized){initialized=true;gsap.ticker.lagSmoothing(0);}
   if(tasks.size===0)document.addEventListener('visibilitychange',sync);
   const createdFrame=gsap.ticker.frame;
   const deferred:FrameTask=time=>{if(gsap.ticker.frame!==createdFrame)task(time);};

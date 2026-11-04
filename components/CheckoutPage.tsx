@@ -4,7 +4,6 @@ import Image from 'next/image';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowUpRight, Landmark, LoaderCircle, LockKeyhole, QrCode } from 'lucide-react';
-import { gsap } from 'gsap';
 import { price, uiPlanToDbPlan, type PlanCode } from '@/lib/plans';
 import { packagePrice, purchaseAllowed } from '@/lib/site-config';
 import { CURRENT_TERMS_VERSION } from '@/lib/terms';
@@ -30,7 +29,6 @@ export function CheckoutPage({ plan }: { plan: PlanCode }) {
   const submitting = useRef(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const termsRef = useRef<HTMLInputElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
   const id = useId();
   const selectedMethod = paymentMethods.find(method => method.id === paymentMethod)!;
   const canonicalPlan = uiPlanToDbPlan(plan);
@@ -39,16 +37,6 @@ export function CheckoutPage({ plan }: { plan: PlanCode }) {
   useEffect(() => {
     if (providers.length && !providers.includes(paymentMethod)) setPaymentMethod(providers[0] as PaymentMethod);
   }, [providers, paymentMethod]);
-  useEffect(() => {
-    gsap.set('#main', { clearProps: 'opacity' });
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const context = gsap.context(() => {
-      gsap.from('[data-checkout-topbar]', { opacity: 0, duration: 0.25, clearProps: 'all' });
-      gsap.from('[data-checkout-enter]', { opacity: 0, y: 12, stagger: 0.04, duration: 0.35, ease: 'power2.out', clearProps: 'all' });
-      gsap.from('[data-checkout-summary]', { opacity: 0, y: 12, delay: 0.08, duration: 0.35, ease: 'power2.out', clearProps: 'all' });
-    }, rootRef);
-    return () => context.revert();
-  }, []);
   useEffect(() => {
     const restore = (event: PageTransitionEvent) => {
       if (event.persisted) { submitting.current = false; setBusy(false); }
@@ -105,7 +93,7 @@ export function CheckoutPage({ plan }: { plan: PlanCode }) {
   }
 
   const note = t('付款经安全加密传输', 'Payments are securely encrypted');
-  return <div ref={rootRef} className={styles.root}>
+  return <div className={styles.root} data-checkout-open>
     <header className={styles.topbar} data-checkout-topbar>
       <button type="button" className={styles.back} onClick={() => window.history.length > 1 ? router.back() : router.push('/#pricing')}>
         <ArrowLeft size={16} aria-hidden="true" />{t('返回', 'Back')}

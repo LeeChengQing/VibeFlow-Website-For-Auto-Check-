@@ -3,7 +3,6 @@ type Listener=(low:boolean)=>void;
 const listeners=new Set<Listener>();
 export function deviceEffectsReason(){
   if(matchMedia('(prefers-reduced-motion:reduce)').matches)return 'reduced-motion';
-  if(navigator.maxTouchPoints>0||matchMedia('(any-pointer:coarse)').matches)return 'touch';
   const memory=(navigator as Navigator&{deviceMemory?:number}).deviceMemory;
   if(navigator.hardwareConcurrency<=4||(memory!==undefined&&memory<=4))return 'hardware';
   return '';
