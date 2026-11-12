@@ -1,4 +1,6 @@
 'use client';
+
+import { MOBILE_VIEWPORT_QUERY } from '@/lib/mobileViewport';
 import Image from 'next/image';
 import { BuyButton } from './BuyButton';
 import Link from 'next/link';
@@ -14,7 +16,7 @@ export function SiteHeader() {
   const menuRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!menu) return;
-    const media = window.matchMedia('(max-width: 767px)');
+    const media = window.matchMedia(MOBILE_VIEWPORT_QUERY);
     if (!media.matches) { setMenu(false); return; }
     headerRef.current?.querySelector<HTMLAnchorElement>('.nav-links a')?.focus();
     const close = () => { setMenu(false); menuRef.current?.focus(); };

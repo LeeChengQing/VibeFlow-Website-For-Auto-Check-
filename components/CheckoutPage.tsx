@@ -71,14 +71,17 @@ export function CheckoutPage({ plan }: { plan: PlanCode }) {
     submitting.current = true;
     setBusy(true);
     let redirecting = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 30_000);
     try {
-      const token = sessionStorage.getItem('auto-check-device-token');
+      let token: string | null = null;
+      try { token = sessionStorage.getItem('auto-check-device-token'); } catch { /* Storage may be unavailable in an embedded browser. */ }
       if (!providers.includes(paymentMethod)) { setError(checkoutError('CHECKOUT_UNAVAILABLE')); return; }
       const response = await fetch(selectedMethod.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
         body: JSON.stringify({ buyer_email: email.trim().toLowerCase(), plan: canonicalPlan, terms_accepted: true, terms_version: CURRENT_TERMS_VERSION }),
-        signal: AbortSignal.timeout(30_000),
+        signal: controller.signal,
       });
       const result = await response.json();
       if (!response.ok) { setError(checkoutError({ status: response.status, response: result })); return; }
@@ -88,6 +91,7 @@ export function CheckoutPage({ plan }: { plan: PlanCode }) {
     } catch (error) {
       setError(checkoutError(error));
     } finally {
+      window.clearTimeout(timeout);
       if (!redirecting) { submitting.current = false; setBusy(false); }
     }
   }
@@ -138,17 +142,19 @@ export function CheckoutPage({ plan }: { plan: PlanCode }) {
             {termsError && <p id={id + '-terms-error'} className={styles.error} role="alert">{termsError}</p>}
           </div>
         </fieldset>
-        <aside className={styles.summary} data-checkout-summary aria-label={t('订单摘要', 'Order summary')}>
-          <p className={styles.summaryLabel}>{t('订单摘要', 'Order summary')}</p>
-          <div className={styles.product}><span className={styles.tile}><Image src="/files/logo.png" alt="" width={30} height={30} /></span><div className={styles.productCopy}><strong>{t(product.name.zh, product.name.en)}</strong><p>{t(product.description.zh, product.description.en)}</p></div><strong className={styles.productPrice}>{amount}</strong></div>
-          <div className={styles.divider} />
-          <div className={styles.total}><strong>{t('今日应付', 'Due today')}</strong><span>{amount}</span></div>
+        <div className={styles.summary} data-checkout-summary>
+          <aside className={styles.summaryBody} aria-label={t('订单摘要', 'Order summary')}>
+            <p className={styles.summaryLabel}>{t('订单摘要', 'Order summary')}</p>
+            <div className={styles.product}><span className={styles.tile}><Image src="/files/logo.png" alt="" width={30} height={30} /></span><div className={styles.productCopy}><strong>{t(product.name.zh, product.name.en)}</strong><p>{t(product.description.zh, product.description.en)}</p></div><strong className={styles.productPrice}>{amount}</strong></div>
+            <div className={styles.divider} />
+            <div className={styles.total}><strong>{t('今日应付', 'Due today')}</strong><span>{amount}</span></div>
+          </aside>
           <div className={styles.actions}>
             {error && <p className={styles.error} role="alert">{error}</p>}
             <button type="submit" className={styles.pay} disabled={busy}>{busy ? <><LoaderCircle className={styles.spinner} size={20} aria-hidden="true" />{t('正在打开…', 'Opening…')}</> : <>{t('前往付款', 'Continue to payment')} · {amount}<ArrowUpRight size={20} aria-hidden="true" /></>}</button>
             <p className={styles.note}>{note}</p>
           </div>
-        </aside>
+        </div>
       </form>
     </div>
   </div>;

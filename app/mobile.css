@@ -1,7 +1,7 @@
 /* Dedicated mobile presentation. Desktop rules and geometry stay in globals.css. */
 .mobile-only { display: none; }
 
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-width: 1100px) and (max-height: 500px) and (pointer: coarse) {
   :root {
     --header-height: calc(56px + env(safe-area-inset-top, 0px));
     --mobile-page-gutter: clamp(14px, 4vw, 20px);
@@ -9,12 +9,23 @@
     --mobile-bottom-gap: 12px;
     --mobile-purchase-space: 0px;
   }
-  html { scroll-padding-top: calc(var(--header-height) + 16px); }
+  html { scroll-padding-top: calc(var(--header-height) + 16px); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   #main { padding-left: 0; padding-right: 0; }
+  :is(.portal, .order-page, .legal-page, .site-footer) {
+    padding-left: max(var(--mobile-page-gutter), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--mobile-page-gutter), env(safe-area-inset-right, 0px));
+  }
+  :is(.portal, .legal-page) { overflow-wrap: anywhere; }
+  .legal-page > div > div:first-child { flex-wrap: wrap; gap: 12px; }
+  .form :is(input, textarea, select), .inline-input { font-size: 16px; }
   .shell {
     padding-left: max(var(--mobile-page-gutter), env(safe-area-inset-left, 0px));
     padding-right: max(var(--mobile-page-gutter), env(safe-area-inset-right, 0px));
   }
+  .site-header { contain: none; backdrop-filter: none; background: #080809f7; }
+  .nav-links { display: none; }
+  .nav-actions > .buy-action { display: none; }
+  .menu-button { display: block; }
   .nav-wrap {
     height: var(--header-height); padding: env(safe-area-inset-top, 0px) max(var(--mobile-page-gutter), env(safe-area-inset-right, 0px)) 0 max(var(--mobile-page-gutter), env(safe-area-inset-left, 0px));
     gap: 12px;
@@ -26,8 +37,9 @@
   .language-button, .menu-button { min-width: 44px; min-height: 44px; padding: 8px; }
   .language-button { font-size: 14px; }
   .nav-links.is-open {
-    position: fixed; top: var(--header-height); bottom: 0; height: calc(100dvh - var(--header-height));
+    position: fixed; top: var(--header-height); bottom: 0; left: 0; right: 0; height: calc(100dvh - var(--header-height));
     display: flex; flex-direction: column; justify-content: flex-start; gap: 12px;
+    background: #111114;
     overflow-y: auto; overscroll-behavior: contain;
     padding: 24px max(24px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px));
   }
@@ -102,7 +114,7 @@
   .faq-list summary { min-height: 52px; font-size: 16px; }
   .final-cta { margin: 64px auto; }
   .final-cta .mobile-final-purchase { margin-top: 24px; }
-  .guide-dialog { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); max-width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px); overflow: auto; }
+  .guide-dialog { max-height: calc(100vh - 24px); max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); max-width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px); overflow: auto; }
   .guide-dialog-head .button { min-height: 44px; }
 }
 
@@ -111,10 +123,57 @@
   .mobile-panel-heading h2, .mobile-panel-heading h3 { font-size: 20px; }
   .mobile-sticky-purchase .button { padding-inline: 12px; }
 }
-@media (max-width: 767px) and (max-height: 480px) {
+@media (max-width: 767px) and (max-height: 480px), (max-width: 1100px) and (max-height: 500px) and (pointer: coarse) {
   .support-orb, .mobile-sticky-purchase { display: none; }
   .mobile-purchase { padding-top: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mobile-plan-selector button { transition: none; }
+}
+
+@media (prefers-color-scheme: light) and (max-width: 900px), (prefers-color-scheme: light) and (max-width: 1100px) and (max-height: 500px) and (pointer: coarse) {
+  :root:not(:has([data-admin-surface])) {
+    color-scheme: light;
+    --bg: #f7f9fc;
+    --surface: #fff;
+    --text: #141d2d;
+    --muted: #536275;
+    --line: #cbd5e1;
+    --accent: #006778;
+    --accent-2: #087064;
+    --light-tint: #edf4f8;
+  }
+
+  html:not(:has([data-admin-surface])) :is(.site-header, .nav-links.is-open, .mobile-sticky-purchase) { background: var(--surface); border-color: var(--line); color: var(--text); }
+  html:not(:has([data-admin-surface])) :is(.nav-links a, .brand-muted, .vibeflow-wordmark, .eyebrow, .muted, .mobile-hero > p:last-child, .mobile-plan-selector button,
+      .mobile-plan-subtitle, .mobile-price-line del, .mobile-price-line > span, .mobile-price-caption, .mobile-separate-value, .mobile-benefits li,
+      .mobile-included summary, .mobile-included li, .mobile-sticky-purchase small, .section-heading > p, .step p, .step-number, .feature p,
+      .notification-banner p, .guide-caption > p:last-child, .faq-list details > p, .faq-list summary > span, .pricing-note, .footer-top p, .footer-bottom,
+      .portal-intro, .back-link, .local-banner, .notice, .form small, .ticket-meta, .notification-price-note, .notification-price-meta,
+      .billing-segment, .notification-current-price > span, .notification-current-price small, .bento-muted, .bento-kicker, .bento-pill, .bento-content > p, .bento-content > div > p,
+      .bento-card-bottom, .bento-task small, .bento-app-bar small, .bento-notification small, .bento-section-heading > p) { color: var(--muted); }
+  html:not(:has([data-admin-surface])) :is(.nav-links a:hover, .mobile-plan-selector button[aria-checked=true], .mobile-panel-heading h2, .mobile-panel-heading h3, .billing-segment[aria-selected=true], .bento-card-bottom a) { color: var(--text); }
+  html:not(:has([data-admin-surface])) :is(.mobile-value-badge, .mobile-plan-selector button > span[aria-hidden=true], .text-link, .bento-capsule-link) { color: var(--accent); }
+  html:not(:has([data-admin-surface])) .mobile-benefits li::before { color: var(--accent); }
+  html:not(:has([data-admin-surface])) .mobile-launch-countdown { color: #805117; }
+  html:not(:has([data-admin-surface])) :is(.mobile-plan-selector, .mobile-included, .faq-list details, .step, .footer-top, .footer-bottom, .price-card li,
+      .video-section, .billing-segmented-control, .bento-pill, .bento-day-strip > span) { border-color: var(--line); }
+  html:not(:has([data-admin-surface])) :is(.mobile-purchase-panel, .price-card, .price-card.featured, .notification-banner, .guide-card, .guide-dialog,
+      .panel, .message, .order-delivery-column, .magic-bento-card) { background: var(--surface); color: var(--text); border-color: var(--line); }
+  html:not(:has([data-admin-surface])) :is(.mobile-plan-selector, .local-banner, .bento-app-preview, .bento-notification, .bento-pill, .billing-segmented-control) {
+      background: var(--light-tint); border-color: var(--line); color: var(--text);
+    }
+  html:not(:has([data-admin-surface])) :is(.bento-app-bar strong, .bento-task strong, .bento-notification strong, .notification-current-price, .delivery-key) { color: var(--text); }
+  html:not(:has([data-admin-surface])) :is(.button.secondary, .button.small:not(.primary), .bento-capsule-link, .plan-badge) { border-color: var(--line); }
+  html:not(:has([data-admin-surface])) .button.primary { background: #0c5464; border-color: #0c5464; color: #fff; }
+  html:not(:has([data-admin-surface])) .button.primary:hover { background: #084656; }
+  html:not(:has([data-admin-surface])) :is(.form input, .form textarea, .form select, .inline-input) { background: var(--surface); color: var(--text); border-color: #98a9ba; }
+  html:not(:has([data-admin-surface])) .form-error { color: #a01d29; }
+  html:not(:has([data-admin-surface])) .form-success { color: #176142; }
+  html:not(:has([data-admin-surface])) .legal-page { background: var(--surface); color: var(--text); }
+  html:not(:has([data-admin-surface])) .legal-page :is(.text-white, .text-gray-200, .text-gray-300) { color: var(--text); }
+  html:not(:has([data-admin-surface])) .legal-page :is(.text-gray-400, .text-gray-500) { color: var(--muted); }
+  html:not(:has([data-admin-surface])) .legal-page [class~="border-white/10"] { border-color: var(--line); }
+  html:not(:has([data-admin-surface])) .legal-page .text-blue-400 { color: var(--accent); }
+  html:not(:has([data-admin-surface])) .legal-page :is(.text-amber-200, .text-amber-300) { color: #795011; }
 }
