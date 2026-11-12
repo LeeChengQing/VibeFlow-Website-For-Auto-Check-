@@ -14,7 +14,7 @@ export default async function TermsPage() {
   await connection();
   const { settings } = await getPublishedSiteConfig();
   return (
-    <main className="min-h-screen bg-[#0c0d10] text-gray-200 px-4 py-12 sm:px-6 lg:px-8 font-sans">
+    <main className="legal-page min-h-screen bg-[#0c0d10] text-gray-200 px-4 py-12 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-3xl mx-auto space-y-10">
         {/* Navigation & Header */}
         <div className="border-b border-white/10 pb-6 flex items-center justify-between">

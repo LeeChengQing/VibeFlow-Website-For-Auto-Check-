@@ -2,6 +2,7 @@
 import {useEffect} from 'react';
 import {usePathname} from 'next/navigation';
 import {gsap} from 'gsap';
+import {TOUCH_VIEWPORT_QUERY} from '../lib/mobileViewport';
 import {subscribeAnimationFrame} from '../lib/animationScheduler';
 import {deviceEffectsReason,setEffectsPolicy} from '../lib/performancePolicy';
 import {beginAmbientNavigation,pauseAmbientInteraction,settleAmbientNavigation} from '../lib/ambientActivity';
@@ -12,6 +13,7 @@ export function PerformanceRuntime(){
   useEffect(()=>settleAmbientNavigation(),[pathname]);
   useEffect(()=>{
     const reduced=matchMedia('(prefers-reduced-motion:reduce)');
+    const touch=matchMedia(TOUCH_VIEWPORT_QUERY);
     let runtimeLow=false,previous=0,windowStart=0,total=0,count=0,slowWindows=0;
     let ignoreUntil=0;
     let frameBudget=1000/60;
@@ -31,14 +33,22 @@ export function PerformanceRuntime(){
     const key=(event:KeyboardEvent)=>{
       if(event.target instanceof Element&&event.target.closest('.mini-plan,.billing-segment')&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Enter',' '].includes(event.key))pauseAmbientInteraction();
     };
-    const syncPolicy=()=>{const reason=deviceEffectsReason();setEffectsPolicy(!!reason||runtimeLow,reason||(runtimeLow?'runtime':''));};
     const sample=(now:number)=>{
       if(document.documentElement.dataset.intro==='playing'||performance.now()<ignoreUntil){previous=0;windowStart=0;total=0;count=0;slowWindows=0;return;}
       if(previous){const delta=now-previous;total+=delta;count++;if(delta>=4)frameBudget=Math.min(frameBudget,delta);}previous=now;
       if(!windowStart)windowStart=now;
       if(now-windowStart<1000||!count)return;
       slowWindows=total/count>frameBudget*1.5?slowWindows+1:0;windowStart=now;total=0;count=0;
-      if(slowWindows>=2){runtimeLow=true;syncPolicy();releaseMonitor?.();releaseMonitor=undefined;}
+      if(slowWindows>=2){runtimeLow=true;syncPolicy();}
+    };
+    const syncPolicy=()=>{
+      const reason=deviceEffectsReason()||(runtimeLow?'runtime':'');
+      setEffectsPolicy(!!reason,reason);
+      if(reason){releaseMonitor?.();releaseMonitor=undefined;}
+      else if(!releaseMonitor){
+        previous=0;windowStart=0;total=0;count=0;slowWindows=0;frameBudget=1000/60;
+        releaseMonitor=subscribeAnimationFrame(sample);
+      }
     };
     const visibility=()=>{
       previous=0;windowStart=0;total=0;count=0;slowWindows=0;
@@ -51,10 +61,10 @@ export function PerformanceRuntime(){
         pausedAnimations.clear();
       }
     };
-    syncPolicy();releaseMonitor=subscribeAnimationFrame(sample);
+    syncPolicy();
     document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);
-    reduced.addEventListener('change',syncPolicy);document.addEventListener('visibilitychange',visibility);
-    return()=>{window.removeEventListener('intro:done',introDone);releaseMonitor?.();document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);reduced.removeEventListener('change',syncPolicy);document.removeEventListener('visibilitychange',visibility);if(pausedTimeline)gsap.globalTimeline.resume();for(const animation of pausedAnimations){const target=(animation.effect as KeyframeEffect|null)?.target;if(target?.isConnected&&animation.playState==='paused')animation.play();}pausedAnimations.clear();};
+    reduced.addEventListener('change',syncPolicy);touch.addEventListener('change',syncPolicy);document.addEventListener('visibilitychange',visibility);
+    return()=>{window.removeEventListener('intro:done',introDone);releaseMonitor?.();document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);reduced.removeEventListener('change',syncPolicy);touch.removeEventListener('change',syncPolicy);document.removeEventListener('visibilitychange',visibility);if(pausedTimeline)gsap.globalTimeline.resume();for(const animation of pausedAnimations){const target=(animation.effect as KeyframeEffect|null)?.target;if(target?.isConnected&&animation.playState==='paused')animation.play();}pausedAnimations.clear();};
   },[]);
   return null;
 }

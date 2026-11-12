@@ -1,5 +1,7 @@
 'use client';
 
+import { MOBILE_VIEWPORT_QUERY } from '@/lib/mobileViewport';
+
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import * as motion from 'framer-motion/m';
@@ -79,7 +81,7 @@ export function MobilePurchase({ initialProduct = 'bundle' }: { initialProduct?:
   useEffect(() => { action.current = requestPurchase; return () => { action.current = null; }; });
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)');
+    const media = window.matchMedia(MOBILE_VIEWPORT_QUERY);
     if (!inlineRef.current || !('IntersectionObserver' in window)) return;
     let passed = false;
     const visible = new Set<Element>();
