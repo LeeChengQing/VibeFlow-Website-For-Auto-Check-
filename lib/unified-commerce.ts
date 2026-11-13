@@ -61,7 +61,7 @@ export async function createUnifiedCheckout(request:Request,provider:'stripe'|'t
     } else {
       const secret=process.env.TOYYIBPAY_SECRET_KEY,category=process.env.TOYYIBPAY_CATEGORY_CODE;
       if(!secret||!category)fail('TOYYIBPAY_NOT_CONFIGURED',503);
-      const fields=new URLSearchParams({userSecretKey:secret,categoryCode:category,billName:'Auto Check '+input.plan,billDescription:'Auto Check '+input.plan,billPriceSetting:'1',billPayorInfo:'0',billAmount:String(price),billReturnUrl:`${origin}/success?order_id=${orderId}`,billCallbackUrl:`${origin}/api/webhook/toyyibpay`,billExternalReferenceNo:orderId,...(email?{billEmail:email}:{}),enableDuitNowQR:'1',chargeDuitNowQR:'0'});
+      const fields=new URLSearchParams({userSecretKey:secret,categoryCode:category,billName:'Auto Check '+input.plan,billDescription:'Auto Check '+input.plan,billPriceSetting:'1',billPayorInfo:'0',billDisplayMerchant:'0',billAmount:String(price),billReturnUrl:`${origin}/success?order_id=${orderId}`,billCallbackUrl:`${origin}/api/webhook/toyyibpay`,billExternalReferenceNo:orderId,...(email?{billEmail:email}:{}),enableDuitNowQR:'1',chargeDuitNowQR:'0'});
       const response=await fetch('https://toyyibpay.com/index.php/api/createBill',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:fields,signal:AbortSignal.timeout(15000),redirect:'error',cache:'no-store'});
       const data=JSON.parse((await response.text()).replace(/^\uFEFF/,''));
       if(!response.ok||!Array.isArray(data)||!/^[A-Za-z0-9_-]{2,64}$/.test(data[0]?.BillCode??''))fail('PAYMENT_PROVIDER_UNAVAILABLE',502);
