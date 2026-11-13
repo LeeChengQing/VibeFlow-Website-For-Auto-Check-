@@ -6,6 +6,7 @@ import {packagePrice,purchaseAllowed} from '@/lib/site-config';
 import {getCommerceDatabase} from '@/lib/supabase/commerce';
 import {getStripe,readStripeBody} from '@/lib/stripe-server';
 import {encryptLicenseKey} from '@/lib/license-key-encryption';
+import {ResendEmailAdapter} from '@/lib/mail/email-service';
 import {generatePluginLicenseKey} from '@/lib/plugin-license-key';
 import {configuredPaymentProviders,publicSalesEnabled} from '@/lib/payments/provider-status';
 
@@ -127,8 +128,29 @@ export async function createUnifiedCheckout(request:Request,provider:'stripe'|'t
 
 export async function fulfillUnifiedOrder(order:any,payment:string,amount:number,currency:string,providerRequest=order.provider_request_id) {
   const key=generatePluginLicenseKey(),hash=digest(key);
-  const result=await commerceDatabase().rpc('fulfill_verified_payment',{p_order:order.id,p_provider:order.payment_provider,p_request:providerRequest,p_payment:payment,p_amount:amount,p_currency:currency.toUpperCase(),p_key_hash:hash,p_key_ciphertext:encryptLicenseKey(key,hash)});
+  const db=commerceDatabase();
+  const result=await db.rpc('fulfill_verified_payment',{p_order:order.id,p_provider:order.payment_provider,p_request:providerRequest,p_payment:payment,p_amount:amount,p_currency:currency.toUpperCase(),p_key_hash:hash,p_key_ciphertext:encryptLicenseKey(key,hash)});
   if(result.error)throw Error('PAYMENT_FULFILLMENT_FAILED');
+  if(result.data?.ok===true&&order.buyer_email&&!order.verification_only){
+    try {
+      const url=new URL('/success',commerceOrigin());
+      url.searchParams.set('order_id',order.id);
+      const eventId='order-email:'+order.id;
+      // Claim once before calling the provider so concurrent callbacks cannot both send.
+      const {data:claimed,error}=await db.from('payment_events').upsert({
+        order_id:order.id,provider:order.payment_provider,event_id:eventId,event_type:'order_email_claimed',
+      },{onConflict:'provider,event_id',ignoreDuplicates:true}).select('event_id');
+      if(error)throw error;
+      if(claimed?.length){
+        await new ResendEmailAdapter().sendOrderLinkEmail(order.buyer_email,order.id,url.href);
+        const {error:markError}=await db.from('payment_events').update({event_type:'order_email_sent'})
+          .eq('provider',order.payment_provider).eq('event_id',eventId);
+        if(markError)throw markError;
+      }
+    }catch{
+      console.error({stage:'order_email',code:'ORDER_EMAIL_FAILED'});
+    }
+  }
   return result.data;
 }
 

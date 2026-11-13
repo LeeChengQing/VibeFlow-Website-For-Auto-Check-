@@ -9,6 +9,10 @@ import { commerceDatabase, commerceOrigin, isOrderId, ownedUnifiedOrder, reply, 
 type PluginOrder={id:string;order_access_token_hash:string};
 export type LatestPluginRelease={version:string;date:string;notes:{zh:string;en:string};sha256:string};
 
+export function isPluginSchemaUnavailable(error: {code?: string} | null | undefined) {
+  return ['42P01','42883','PGRST200','PGRST202','PGRST205'].includes(error?.code ?? '');
+}
+
 const pluginCookie='__Host-ac-plugin-order';
 const sessionSeconds=900;
 export function createPluginOrderSession(order:PluginOrder) {
@@ -22,6 +26,7 @@ export async function resolvePluginOrder(request:Pick<Request,'headers'>):Promis
   const db=commerceDatabase();
   const lookup=async (orderId:string)=>{
     const {data,error}=await db.rpc('plugin_order_session',{p_order_id:orderId});
+    if(isPluginSchemaUnavailable(error))return null;
     if(error)throw Error('order_unavailable');
     return data as PluginOrder|null;
   };
@@ -48,6 +53,7 @@ export async function getLatestPluginRelease():Promise<LatestPluginRelease|null>
   const {data,error}=await commerceDatabase().from('current_stable')
     .select('plugin_release!inner(version,created_at,notes_zh,notes_en,sha256)')
     .eq('plugin_release.status','published').maybeSingle();
+  if(isPluginSchemaUnavailable(error))return null;
   if(error)throw Error('release_unavailable');
   const release=data?.plugin_release;
   return release?{version:release.version,date:release.created_at,
@@ -71,7 +77,7 @@ export async function issuePluginDownload(request:Request) {
     const {data:version,error}=await commerceDatabase().rpc('issue_plugin_download',{
       p_order_id:order.id,p_receipt_hash:order.order_access_token_hash,p_token_hash:tokenHash,
     });
-    if(error)return unavailableDownload();
+    if(error)return isPluginSchemaUnavailable(error)?forbiddenDownload():unavailableDownload();
     return version ? reply({url:'/api/plugin/download/'+token,version}) : forbiddenDownload();
   }catch{return unavailableDownload();}
 }
@@ -84,7 +90,7 @@ export async function redeemPluginDownload(request:Request,token:string) {
     const {data:release,error}=await db.rpc('consume_plugin_download',{
       p_token_hash:hashOrderAccessToken(token),p_ip:isIP(ip)?ip:null,p_ua:request.headers.get('user-agent')?.slice(0,512)??null,
     });
-    if(error)return unavailableDownload();
+    if(error)return isPluginSchemaUnavailable(error)?forbiddenDownload():unavailableDownload();
     if(!release)return forbiddenDownload();
 
     const bucket=await db.storage.getBucket('site-assets');

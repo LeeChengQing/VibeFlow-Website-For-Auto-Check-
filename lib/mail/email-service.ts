@@ -114,6 +114,26 @@ export class ResendEmailAdapter implements EmailDeliveryAdapter {
     return { messageId: data.id };
   }
 
+  async sendOrderLinkEmail(to: string, orderId: string, orderUrl: string): Promise<void> {
+    if (!this.apiKey) throw Error('ORDER_EMAIL_UNAVAILABLE');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + this.apiKey,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'order-email:' + orderId,
+      },
+      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify({
+        from: this.fromAddress,
+        to: [to],
+        subject: 'Your Auto-Check order',
+        text: orderUrl,
+      }),
+    });
+    if (!response.ok) throw Error('ORDER_EMAIL_UNAVAILABLE');
+  }
+
   async sendPluginOtp(to: string, code: string, challengeId: string): Promise<void> {
     if (!this.apiKey) throw Error('OTP_MAIL_UNAVAILABLE');
     const res = await fetch('https://api.resend.com/emails', {
