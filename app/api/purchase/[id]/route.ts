@@ -1,5 +1,5 @@
 import {decryptLicenseKey} from '@/lib/license-key-encryption';
-import {commerceDatabase,commerceOrigin,ownedUnifiedOrder,reply} from '@/lib/unified-commerce';
+import {commerceDatabase,commerceOrigin,ownedUnifiedOrder,reply,signOrderDownload} from '@/lib/unified-commerce';
 type Context={params:Promise<{id:string}>};
 export async function GET(request:Request,context:Context){
   try{
@@ -22,9 +22,9 @@ export async function POST(request:Request,context:Context){
     if(action==='download'&&order.release_asset_id&&Date.parse(order.paid_at)+7*86400000>Date.now()){
       const {data:asset,error}=await db.from('site_assets').select('object_path').eq('id',order.release_asset_id).eq('kind','release').maybeSingle();
       if(error||!asset)return reply({error:'DOWNLOAD_UNAVAILABLE'},503);
-      const signed=await db.storage.from('site-assets').createSignedUrl(asset.object_path,300);
-      if(signed.error)return reply({error:'DOWNLOAD_UNAVAILABLE'},503);
-      return reply({url:signed.data.signedUrl});
+      const url=await signOrderDownload(db,asset.object_path,300);
+      if(!url)return reply({error:'DOWNLOAD_UNAVAILABLE'},503);
+      return reply({url});
     }
     return reply({error:'INVALID_ACTION'},400);
   }catch{return reply({error:'ORDER_UNAVAILABLE'},503);}

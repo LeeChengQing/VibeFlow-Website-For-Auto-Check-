@@ -65,7 +65,7 @@ export class ResendEmailAdapter implements EmailDeliveryAdapter {
 
   async sendFulfillmentEmail(params: FulfillmentEmailParams): Promise<{ messageId: string }> {
     if (!this.apiKey) {
-      console.warn('[email-adapter] RESEND_API_KEY missing; simulated delivery for:', params.to);
+      console.warn('[email-adapter] RESEND_API_KEY missing; simulated delivery');
       return { messageId: `simulated-fulfillment-${params.orderId}` };
     }
 
@@ -87,7 +87,7 @@ export class ResendEmailAdapter implements EmailDeliveryAdapter {
         <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
         <p style="font-size: 12px; color: #6b7280;">
           <strong>退款政策：</strong>自购买起 7 天内且<strong>未激活</strong>的许可证支持全额退款。一旦激活使用，原则上不予退款。<br/>
-          如有疑问请访问 <a href="https://auto-check.example/support">客户支持中心</a>。
+          如有疑问请访问 <a href="${new URL('/support', process.env.APP_URL ?? 'https://auto-check.vibeflow-my.workers.dev').href}">客户支持中心</a>。
         </p>
       </div>
     `;
@@ -107,17 +107,35 @@ export class ResendEmailAdapter implements EmailDeliveryAdapter {
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Resend fulfillment email failed (${res.status}): ${errText}`);
+      throw new Error(`Resend fulfillment email failed (${res.status})`);
     }
 
     const data = await res.json() as { id: string };
     return { messageId: data.id };
   }
 
+  async sendPluginOtp(to: string, code: string, challengeId: string): Promise<void> {
+    if (!this.apiKey) throw Error('OTP_MAIL_UNAVAILABLE');
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer '+this.apiKey,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'plugin-otp-'+challengeId,
+      },
+      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify({
+        from: this.fromAddress, to: [to], subject: 'Auto-Check download verification code',
+        text: 'Auto-Check 下载验证码 / Download verification code: '+code+
+          '\n验证码 10 分钟内有效。 / This code expires in 10 minutes.',
+      }),
+    });
+    if (!res.ok) throw Error('OTP_MAIL_UNAVAILABLE');
+  }
+
   async sendRefundEmail(params: RefundEmailParams): Promise<{ messageId: string }> {
     if (!this.apiKey) {
-      console.warn('[email-adapter] RESEND_API_KEY missing; simulated refund email for:', params.to);
+      console.warn('[email-adapter] RESEND_API_KEY missing; simulated refund email');
       return { messageId: `simulated-refund-${params.orderId}` };
     }
 
@@ -148,8 +166,7 @@ export class ResendEmailAdapter implements EmailDeliveryAdapter {
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Resend refund email failed (${res.status}): ${errText}`);
+      throw new Error(`Resend refund email failed (${res.status})`);
     }
 
     const data = await res.json() as { id: string };

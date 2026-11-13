@@ -1,4 +1,15 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+
+export function readOrderCookie(headers:Pick<Headers,'get'>,name:string) {
+  return (headers.get('cookie')??'').split(';').map(value=>value.trim())
+    .find(value=>value.startsWith(name+'='))?.slice(name.length+1)??'';
+}
+
+export function pluginProof(scope:string,...values:string[]) {
+  const secret=process.env.PLUGIN_OTP_SECRET?.trim()??'';
+  if(!/^[a-fA-F0-9]{64}$/.test(secret))throw Error('PLUGIN_OTP_NOT_CONFIGURED');
+  return createHmac('sha256',Buffer.from(secret,'hex')).update(JSON.stringify([scope,...values])).digest('hex');
+}
 
 /**
  * Computes SHA-256 hash of an order capability access token.

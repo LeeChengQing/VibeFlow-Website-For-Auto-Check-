@@ -15,10 +15,10 @@ export async function GET() {
     if (!error) {
       dbStatus = 'connected';
     } else {
-      dbStatus = `error: ${error.message}`;
+      dbStatus = 'disconnected';
     }
-  } catch (err: any) {
-    dbStatus = `unreachable: ${err.message}`;
+  } catch {
+    dbStatus = 'disconnected';
   }
 
   const zipPath = resolve('public/downloads/auto-check-extension.zip');

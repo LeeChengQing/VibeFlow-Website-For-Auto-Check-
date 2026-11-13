@@ -19,13 +19,6 @@ function configuredSnapshot(appUrlStatus?: DiagnosticStatus) {
   } satisfies Record<string, DiagnosticStatus>;
 }
 
-function redactLogText(value: unknown, secret = process.env.STRIPE_SECRET_KEY): string | null {
-  if (value === undefined || value === null) return null;
-  let text = String(value);
-  if (secret) text = text.split(secret).join('[redacted-secret]');
-  return text.replace(/https?:\/\/[^\s]+/gi, '[redacted-url]').replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]');
-}
-
 function stripeModePrefix() {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   return key?.startsWith('sk_test_') || key?.startsWith('sk_live_') ? key.slice(0, 8) : 'unknown';
@@ -63,12 +56,10 @@ export function stripeResponse(body: Record<string, unknown>, status = 200) {
 
 export function stripeErrorResponse(error: unknown, apiCall = 'unknown') {
   if (error instanceof StripeCheckoutError) return stripeResponse({ error: error.code }, error.status);
-  const stripeError = error as { type?: unknown; code?: unknown; param?: unknown; statusCode?: unknown; message?: unknown; requestId?: unknown; _requestId?: unknown };
+  const stripeError = error as { statusCode?: unknown };
   console.error('[checkout-diag]', JSON.stringify({
     provider: 'stripe', event: 'provider_error', apiCall,
-    type: redactLogText(stripeError.type), code: redactLogText(stripeError.code),
-    param: redactLogText(stripeError.param), statusCode: typeof stripeError.statusCode === 'number' ? stripeError.statusCode : null,
-    message: redactLogText(stripeError.message ?? error), requestId: redactLogText(stripeError.requestId ?? stripeError._requestId),
+    statusCode: typeof stripeError.statusCode === 'number' ? stripeError.statusCode : null,
     modePrefix: stripeModePrefix(),
   }));
   return stripeResponse({ error: 'PAYMENT_PROVIDER_UNAVAILABLE' }, 502);

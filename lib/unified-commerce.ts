@@ -1,5 +1,6 @@
 import 'server-only';
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
+import {readOrderCookie} from '@/lib/order-access-token';
 import {getPublishedSiteConfig} from '@/lib/site-settings';
 import {packagePrice,purchaseAllowed} from '@/lib/site-config';
 import {getCommerceDatabase} from '@/lib/supabase/commerce';
@@ -13,12 +14,35 @@ const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 export const isOrderId=(value:unknown):value is string=>typeof value==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value);
 export const commerceDatabase=()=>getCommerceDatabase() as any;
 export const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:unifiedHeaders});
+export async function signOrderDownload(db:ReturnType<typeof commerceDatabase>,storageKey:string,seconds:number) {
+  const signed=await db.storage.from('site-assets').createSignedUrl(storageKey,seconds);
+  return signed.error?null:signed.data?.signedUrl??null;
+}
 export const commerceOrigin=()=>new URL(process.env.APP_URL??'https://vf-auto-check.vercel.app').origin;
 export function internalCheckoutAuthorized(request:Request) {
   const actual=Buffer.from(request.headers.get('authorization')??''),expected=Buffer.from('Bearer '+(process.env.SUPABASE_SERVICE_ROLE_KEY??''));
   return !!process.env.SUPABASE_SERVICE_ROLE_KEY&&actual.length===expected.length&&timingSafeEqual(actual,expected);
 }
 function fail(code:string,status:number):never{throw Object.assign(Error(code),{status});}
+
+function logCheckoutFailure(stage:string,code:string,error?:unknown) {
+  const name=error instanceof Error?error.name:'Error';
+  const safeNames=['Error','TypeError','RangeError','StripeError','StripeInvalidRequestError','StripeAuthenticationError','StripePermissionError','StripeConnectionError','StripeAPIError','StripeRateLimitError'];
+  console.error(JSON.stringify({stage,code,name:safeNames.includes(name)?name:'Error'}));
+}
+
+function validateCheckoutEncryptionKey() {
+  const key=process.env.LICENSE_KEY_ENCRYPTION_KEY?.trim();
+  let reason:string;
+  if(!key)reason='missing';
+  else if(/[^A-Za-z0-9+/=]/.test(key))reason='bad_charset';
+  else if(key.length!==44)reason='bad_length';
+  else if(!/^[A-Za-z0-9+/]{43}=$/.test(key))reason='bad_charset';
+  else if(Buffer.from(key,'base64').length!==32)reason='not_32_bytes';
+  else return;
+  logCheckoutFailure('key_format',reason);
+  fail('CHECKOUT_UNAVAILABLE',503);
+}
 
 export async function createUnifiedCheckout(request:Request,provider:'stripe'|'toyyibpay',deviceId:string|null=null,verification=false) {
   let orderId:string|undefined;
@@ -47,17 +71,36 @@ export async function createUnifiedCheckout(request:Request,provider:'stripe'|'t
     const plugin=['extension','bundle'].includes(input.plan),release=config.settings.extensionRelease;
     if(plugin&&!release?.assetId)fail('RELEASE_NOT_CONFIGURED',503);
     if(deviceId){const licensed=await commerceDatabase().rpc('validate_device_plugin_license',{p_device_id:deviceId});if(licensed.error||licensed.data?.licensed!==true)fail('PLUGIN_LICENSE_REQUIRED',403);}
-    if(plugin)encryptLicenseKey('configuration-check',digest('configuration-check'));
+    if(plugin){
+      validateCheckoutEncryptionKey();
+      try {
+        encryptLicenseKey('configuration-check',digest('configuration-check'));
+      } catch(error) {
+        logCheckoutFailure('encryption_preflight','ENCRYPTION_FAILED',error);
+        fail('CHECKOUT_UNAVAILABLE',503);
+      }
+    }
     const token=generatePluginLicenseKey()+generatePluginLicenseKey();
     orderId=randomUUID();
     const db=commerceDatabase(),row={id:orderId,plan:input.plan,device_id:deviceId,buyer_email:email,amount_minor:price,currency:'MYR',payment_provider:provider,phone_duration_days:input.plan==='yearly'?365:input.plan==='extension'?0:130,order_access_token_hash:digest(token),release_asset_id:plugin?release!.assetId:null,terms_version:'2026-10-06',terms_accepted_at:new Date().toISOString(),verification_only:verification};
-    const inserted=await db.from('payment_orders').insert(row);if(inserted.error)fail('ORDER_CREATE_FAILED',503);
+    try {
+      const inserted=await db.from('payment_orders').insert(row);
+      if(inserted.error)throw inserted.error;
+    } catch(error) {
+      logCheckoutFailure('payment_orders_insert','ORDER_CREATE_FAILED',error);
+      fail('CHECKOUT_UNAVAILABLE',503);
+    }
     let providerId:string,url:string;
     if(provider==='stripe') {
-      const session=await getStripe().checkout.sessions.create({mode:'payment',allowed_payment_method_types:['card','fpx','alipay'],...(email?{customer_email:email}:{}),client_reference_id:orderId,metadata:{order_id:orderId},payment_intent_data:{metadata:{order_id:orderId}},line_items:[{quantity:1,price_data:{currency:'myr',unit_amount:price,product_data:{name:config.packages.find(p=>p.id===mapping[input.plan])!.name.en}}}],success_url:`${origin}/success?order_id=${orderId}`,cancel_url:`${origin}/#pricing`},{idempotencyKey:'checkout-'+orderId});
-      console.info('[checkout-methods]',{provider:'stripe',methods:session.payment_method_types});
-      providerId=session.id;url=session.url??'';
-      if(!url.startsWith('https://checkout.stripe.com/'))fail('PAYMENT_PROVIDER_UNAVAILABLE',502);
+      try {
+        const session=await getStripe().checkout.sessions.create({mode:'payment',allowed_payment_method_types:['card','fpx','alipay'],...(email?{customer_email:email}:{}),client_reference_id:orderId,metadata:{order_id:orderId},payment_intent_data:{metadata:{order_id:orderId}},line_items:[{quantity:1,price_data:{currency:'myr',unit_amount:price,product_data:{name:config.packages.find(p=>p.id===mapping[input.plan])!.name.en}}}],success_url:`${origin}/success?order_id=${orderId}`,cancel_url:`${origin}/#pricing`},{idempotencyKey:'checkout-'+orderId});
+        console.info('[checkout-methods]',{provider:'stripe',methods:session.payment_method_types});
+        providerId=session.id;url=session.url??'';
+        if(!url.startsWith('https://checkout.stripe.com/'))fail('INVALID_SESSION_URL',502);
+      } catch(error) {
+        logCheckoutFailure('stripe_session_create','STRIPE_SESSION_CREATE_FAILED',error);
+        fail('CHECKOUT_UNAVAILABLE',503);
+      }
     } else {
       const secret=process.env.TOYYIBPAY_SECRET_KEY,category=process.env.TOYYIBPAY_CATEGORY_CODE;
       if(!secret||!category)fail('TOYYIBPAY_NOT_CONFIGURED',503);
@@ -71,7 +114,13 @@ export async function createUnifiedCheckout(request:Request,provider:'stripe'|'t
     if(saved.error)fail('ORDER_SAVE_FAILED',503);
     return Response.json({url,reference:orderId},{headers:{...unifiedHeaders,'Set-Cookie':`ac-order-${orderId}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000; Secure`}});
   } catch(error) {
-    if(orderId)await commerceDatabase().from('payment_orders').update({status:'cancelled'}).eq('id',orderId).eq('status','pending');
+    if(orderId){
+      try {
+        await commerceDatabase().from('payment_orders').update({status:'cancelled'}).eq('id',orderId).eq('status','pending');
+      } catch {
+        // Preserve the original checkout response if order cleanup also fails.
+      }
+    }
     return reply({error:error instanceof Error&&'status' in error?error.message:'CHECKOUT_UNAVAILABLE'},Number((error as {status?:number})?.status)||503);
   }
 }
@@ -83,10 +132,9 @@ export async function fulfillUnifiedOrder(order:any,payment:string,amount:number
   return result.data;
 }
 
-export async function ownedUnifiedOrder(request:Request,id:string) {
+export async function ownedUnifiedOrder(request:Pick<Request,'headers'>,id:string) {
   if(!isOrderId(id))return null;
-  const cookie=(request.headers.get('cookie')??'').split(';').map(v=>v.trim()).find(v=>v.startsWith(`ac-order-${id}=`));
-  const token=cookie?.slice(cookie.indexOf('=')+1);
+  const token=readOrderCookie(request.headers,`ac-order-${id}`);
   if(!token||token.length>256)return null;
   const {data,error}=await commerceDatabase().from('payment_orders').select('*').eq('id',id).eq('order_access_token_hash',digest(token)).maybeSingle();
   if(error)throw Error('ORDER_UNAVAILABLE');return data;

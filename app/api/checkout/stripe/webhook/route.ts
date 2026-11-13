@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     if (!signature) throw new StripeCheckoutError('INVALID_SIGNATURE', 401);
     const rawBody = await readStripeBody(request, 262_144);
     let event: Stripe.Event;
-    apiCall = 'webhooks.constructEvent';
-    try { event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET!.trim()); }
+    apiCall = 'webhooks.constructEventAsync';
+    try { event = await stripe.webhooks.constructEventAsync(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET!.trim()); }
     catch { throw new StripeCheckoutError('INVALID_SIGNATURE', 401); }
 
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     } else {
       const { handleStripeWebhookEvent } = await import('@/lib/payments/stripe-webhook-events');
       const db = getCommerceDatabase();
-      await handleStripeWebhookEvent(db, event);
+      await handleStripeWebhookEvent(db, event, async payment => (await stripe.paymentIntents.retrieve(payment)).metadata.order_id);
     }
 
     return stripeResponse({ ok: true });

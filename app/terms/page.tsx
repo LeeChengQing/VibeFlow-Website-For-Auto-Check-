@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CURRENT_TERMS_VERSION } from '@/lib/consent';
 import { connection } from 'next/server';
-import { getPublishedSiteConfig } from '@/lib/site-settings';
 
 export const metadata: Metadata = {
   title: '服务条款、隐私政策与退款规则 · Auto-Check',
@@ -12,7 +11,6 @@ export const metadata: Metadata = {
 
 export default async function TermsPage() {
   await connection();
-  const { settings } = await getPublishedSiteConfig();
   return (
     <main className="min-h-screen bg-[#0c0d10] text-gray-200 px-4 py-12 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-3xl mx-auto space-y-10">
@@ -95,7 +93,6 @@ export default async function TermsPage() {
             </p>
             <ul className="list-disc list-inside space-y-1 text-gray-400">
               <li>客服渠道：<Link href="/support" className="text-blue-400 hover:text-blue-300 underline">客户支持页面 (/support)</Link></li>
-              {settings.supportEmail && <li>官方联系邮箱：<a href={`mailto:${settings.supportEmail}`} className="text-blue-400 hover:text-blue-300 underline">{settings.supportEmail}</a></li>}
             </ul>
           </div>
         </section>
