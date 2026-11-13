@@ -25,6 +25,7 @@ async function otpInput(request:Request) {
 }
 
 export async function requestPluginOtp(request:Request) {
+  if(!process.env.PLUGIN_OTP_SECRET?.trim())return rejected();
   try {
     const input=await otpInput(request);
     if(!input)return accepted();

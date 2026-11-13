@@ -114,6 +114,7 @@ test('plugin APIs return generic responses for absent tables or RPCs', async () 
   assert.equal((await plugins.issuePluginDownload(request)).status, 403);
   assert.equal((await plugins.redeemPluginDownload(request, 'a'.repeat(43))).status, 403);
   errorCode = 'PGRST205';
+  const otpEnv = {PLUGIN_OTP_SECRET: 'f'.repeat(64)};
   const otp = loadServerModule<typeof import('../lib/plugin-otp')>('lib/plugin-otp.ts', {
     'next/server': {},
     '@/lib/mail/email-service': {},
@@ -121,7 +122,9 @@ test('plugin APIs return generic responses for absent tables or RPCs', async () 
     '@/lib/plugin-download': plugins,
     '@/lib/stripe-server': {readStripeBody: async () => Buffer.from('{"email":"buyer@example.invalid","code":"123456"}')},
     '@/lib/unified-commerce': core,
-  });
+  }, {process: {env: otpEnv}});
   assert.equal((await otp.requestPluginOtp(request)).status, 403);
   assert.equal((await otp.verifyPluginOtp(request)).status, 403);
+  otpEnv.PLUGIN_OTP_SECRET = '';
+  assert.equal((await otp.requestPluginOtp(request)).status, 403);
 });
