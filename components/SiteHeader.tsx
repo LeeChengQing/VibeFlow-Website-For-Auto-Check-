@@ -1,5 +1,6 @@
 'use client';
 import Image from 'next/image';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { BuyButton } from './BuyButton';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -7,7 +8,7 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useLocale } from './LocaleProvider';
 import { useSiteConfig } from './SiteConfigProvider';
 export function SiteHeader() {
-  const {locale,setLocale,t}=useLocale(); const [menu,setMenu]=useState(false);
+  const {t}=useLocale(); const [menu,setMenu]=useState(false);
   const pathname = usePathname();
   const { config } = useSiteConfig();
   const headerRef = useRef<HTMLElement>(null);
@@ -22,7 +23,7 @@ export function SiteHeader() {
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); close(); }
       if (event.key !== 'Tab') return;
-      const controls = [...(headerRef.current?.querySelectorAll<HTMLElement>('.nav-links a, .language-button, .menu-button') ?? [])];
+      const controls = [...(headerRef.current?.querySelectorAll<HTMLElement>('.nav-links a, .language-switcher button, .menu-button') ?? [])];
       const first = controls[0], last = controls[controls.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -49,6 +50,6 @@ export function SiteHeader() {
     <nav id="site-navigation" className={menu?'nav-links is-open':'nav-links'} aria-label={t('主导航','Main navigation')}>
       <Link prefetch={true} href="/#product" onClick={()=>setMenu(false)}>{t('产品介绍','Product')}</Link><Link prefetch={true} href="/#tutorials" onClick={()=>setMenu(false)}>{t('使用教程','Guides')}</Link>{config.settings.supportUrl&&<Link prefetch={true} href={config.settings.supportUrl} onClick={()=>setMenu(false)}>{t('联系客服','Support')}</Link>}
     </nav>
-    <div className="nav-actions"><button className="language-button" onClick={()=>setLocale(locale==='zh'?'en':'zh')} aria-label={locale==='zh'?'Switch to English':'切换中文'}>{locale==='zh'?'EN':'中文'}</button><BuyButton plan="bundle" className="button small primary">{t('立即购买','Get started')}</BuyButton><button ref={menuRef} className="menu-button" aria-label={menu?t('关闭导航','Close navigation'):t('打开导航','Toggle navigation')} aria-controls="site-navigation" aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?'×':'☰'}</button></div>
+    <div className="nav-actions"><LanguageSwitcher /><BuyButton plan="bundle" className="button small primary">{t('立即购买','Get started')}</BuyButton><button ref={menuRef} className="menu-button" aria-label={menu?t('关闭导航','Close navigation'):t('打开导航','Toggle navigation')} aria-controls="site-navigation" aria-expanded={menu} onClick={()=>setMenu(!menu)}>{menu?'×':'☰'}</button></div>
   </div></header>;
 }

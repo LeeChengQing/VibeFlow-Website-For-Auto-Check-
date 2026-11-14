@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { displayAmount, price } from '@/lib/plans';
 import { DEFAULT_SITE_CONFIG } from '@/lib/site-config';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { useLocale } from './LocaleProvider';
 import { Showcase } from './Showcase';
 import { BuyButton } from './BuyButton';
@@ -32,7 +33,7 @@ function ExtensionPricingCard() {
 }
 
 export function Landing({children}:{children:ReactNode}){
-  const {t,locale,setLocale}=useLocale();const [guide,setGuide]=useState<{src:string;title:string;alt:string}|null>(null);
+  const {t,locale}=useLocale();const [guide,setGuide]=useState<{src:string;title:string;alt:string}|null>(null);
   const {config,preview,pricingReady,pricingFailed}=useSiteConfig();
   const purchaseNotice=config.content.purchaseNotice[locale];
   const rootRef=useRef<HTMLDivElement>(null);useLandingMotion(rootRef,locale);
@@ -44,7 +45,10 @@ export function Landing({children}:{children:ReactNode}){
   if(notificationPackages.length)cards.push({id:notificationPackages[0].id,order:notificationPackages[0].order});
   cards.sort((a,b)=>a.order-b.order);
   return <div className="landing" ref={rootRef}>
-    {preview&&<div className="shell panel" role="status">{t('草稿预览 · 结账已禁用','Draft preview · Checkout disabled')} <button type="button" className="button small secondary" onClick={()=>setLocale(locale==='zh'?'en':'zh')}>{locale==='zh'?'Preview in English':'预览中文'}</button></div>}
+    {preview&&<div className="shell panel">
+      <span role="status">{t('草稿预览 · 结账已禁用','Draft preview · Checkout disabled')}</span>{' '}
+      <LanguageSwitcher />
+    </div>}
     {config.settings.maintenance&&<div className="shell panel" role="status">{config.settings.maintenanceMessage[locale]}</div>}
     {config.content.announcementEnabled&&<div className="shell panel" role="status">{config.content.announcement[locale]}</div>}
     {!config.settings.maintenance&&!preview&&(!pricingReady||!config.settings.checkoutEnabled)&&<div className="shell panel" role="status">{!pricingReady?(pricingFailed?t('价格加载失败，正在自动重试；暂不可结账。','Prices could not be loaded. Retrying automatically; checkout is temporarily unavailable.'):t('正在获取最新价格；暂不可结账。','Checking current prices; checkout is temporarily unavailable.')):t('结账暂不可用，请稍后再来。','Checkout is currently unavailable. Please check back soon.')}</div>}
